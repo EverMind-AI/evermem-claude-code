@@ -112,55 +112,52 @@ echo -e "${YELLOW}  Step 2: Install Plugin${NC}"
 echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 
-# Get the directory where the install script is located
-# Handle both direct execution and sourcing
-if [[ -n "${BASH_SOURCE[0]}" && "${BASH_SOURCE[0]}" != "$0" ]]; then
-    SCRIPT_PATH="${BASH_SOURCE[0]}"
-else
-    SCRIPT_PATH="$0"
+REPO_URL="https://github.com/EverMind-AI/evermem-claude-code.git"
+PLUGIN_DIR="$HOME/.evermem"
+
+# Check if we're running from a cloned repo or via curl
+SCRIPT_DIR=""
+if [[ -n "${BASH_SOURCE[0]}" && "${BASH_SOURCE[0]}" != "bash" ]]; then
+    POSSIBLE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
+    if [[ -f "$POSSIBLE_DIR/.claude-plugin/marketplace.json" ]]; then
+        SCRIPT_DIR="$POSSIBLE_DIR"
+    fi
 fi
-# Resolve to absolute path
-if [[ "$SCRIPT_PATH" == /* ]]; then
-    SCRIPT_DIR="$(dirname "$SCRIPT_PATH")"
-else
-    SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" 2>/dev/null && pwd)"
-fi
-# Verify the marketplace.json exists
-if [[ ! -f "$SCRIPT_DIR/.claude-plugin/marketplace.json" ]]; then
-    echo -e "${RED}❌ Error: marketplace.json not found${NC}"
-    echo "Please run this script from the cloned repository directory:"
-    echo "  cd /path/to/evermem-claude-code && bash install.sh"
-    exit 1
+
+# If not running from repo, clone it
+if [[ -z "$SCRIPT_DIR" ]]; then
+    echo "Downloading EverMem plugin..."
+    if [[ -d "$PLUGIN_DIR" ]]; then
+        echo "Updating existing installation..."
+        cd "$PLUGIN_DIR" && git pull --quiet 2>/dev/null || {
+            rm -rf "$PLUGIN_DIR"
+            git clone --quiet "$REPO_URL" "$PLUGIN_DIR"
+        }
+    else
+        git clone --quiet "$REPO_URL" "$PLUGIN_DIR"
+    fi
+    SCRIPT_DIR="$PLUGIN_DIR"
+    echo -e "${GREEN}✓${NC} Plugin downloaded to $PLUGIN_DIR"
 fi
 
 # Add marketplace from local clone
 echo "Adding EverMem marketplace..."
-if claude plugin marketplace add "$SCRIPT_DIR" 2>&1 | grep -q "Successfully\|already exists"; then
+claude plugin marketplace remove evermem 2>/dev/null || true
+if claude plugin marketplace add "$SCRIPT_DIR" 2>&1 | grep -q "Successfully"; then
     echo -e "${GREEN}✓${NC} Marketplace added"
 else
-    # Try to update if already exists
-    claude plugin marketplace remove evermem 2>/dev/null || true
-    if claude plugin marketplace add "$SCRIPT_DIR" 2>&1; then
-        echo -e "${GREEN}✓${NC} Marketplace added"
-    else
-        echo -e "${RED}❌ Failed to add marketplace${NC}"
-        exit 1
-    fi
+    echo -e "${RED}❌ Failed to add marketplace${NC}"
+    exit 1
 fi
 
 # Install plugin
 echo "Installing EverMem plugin..."
+claude plugin uninstall evermem@evermem 2>/dev/null || true
 if claude plugin install evermem@evermem --scope user 2>&1 | grep -q "Successfully"; then
     echo -e "${GREEN}✓${NC} Plugin installed"
 else
-    # Try reinstalling
-    claude plugin uninstall evermem@evermem 2>/dev/null || true
-    if claude plugin install evermem@evermem --scope user 2>&1; then
-        echo -e "${GREEN}✓${NC} Plugin installed"
-    else
-        echo -e "${RED}❌ Failed to install plugin${NC}"
-        exit 1
-    fi
+    echo -e "${RED}❌ Failed to install plugin${NC}"
+    exit 1
 fi
 
 echo ""
