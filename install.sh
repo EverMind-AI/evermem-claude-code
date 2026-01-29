@@ -112,15 +112,38 @@ echo -e "${YELLOW}  Step 2: Install Plugin${NC}"
 echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 
-# Add marketplace
+# Get the directory where the install script is located
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Add marketplace from local clone
 echo "Adding EverMem marketplace..."
-claude plugin marketplace add EverMind-AI/evermem-claude-code 2>/dev/null || true
-echo -e "${GREEN}✓${NC} Marketplace added"
+if claude plugin marketplace add "$SCRIPT_DIR" 2>&1 | grep -q "Successfully\|already exists"; then
+    echo -e "${GREEN}✓${NC} Marketplace added"
+else
+    # Try to update if already exists
+    claude plugin marketplace remove evermem 2>/dev/null || true
+    if claude plugin marketplace add "$SCRIPT_DIR" 2>&1; then
+        echo -e "${GREEN}✓${NC} Marketplace added"
+    else
+        echo -e "${RED}❌ Failed to add marketplace${NC}"
+        exit 1
+    fi
+fi
 
 # Install plugin
 echo "Installing EverMem plugin..."
-claude plugin install evermem@evermem --scope user 2>/dev/null || true
-echo -e "${GREEN}✓${NC} Plugin installed"
+if claude plugin install evermem@evermem --scope user 2>&1 | grep -q "Successfully"; then
+    echo -e "${GREEN}✓${NC} Plugin installed"
+else
+    # Try reinstalling
+    claude plugin uninstall evermem@evermem 2>/dev/null || true
+    if claude plugin install evermem@evermem --scope user 2>&1; then
+        echo -e "${GREEN}✓${NC} Plugin installed"
+    else
+        echo -e "${RED}❌ Failed to install plugin${NC}"
+        exit 1
+    fi
+fi
 
 echo ""
 echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
