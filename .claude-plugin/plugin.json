@@ -6,5 +6,6 @@
     "name": "EverMem"
   },
   "keywords": ["memory", "context", "recall", "persistence"],
-  "commands": "./commands"
+  "commands": "./commands",
+  "skills": "./skills"
 }
