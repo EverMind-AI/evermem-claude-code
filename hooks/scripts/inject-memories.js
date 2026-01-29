@@ -8,18 +8,28 @@
  *
  * Flow:
  * 1. Read prompt from stdin
- * 2. Skip if prompt is too short (< 3 words)
- * 3. Search mock memories for candidates
- * 4. Use Claude SDK to filter and summarize relevant memories
+ * 2. Skip if prompt is too short or API not configured
+ * 3. Search EverMem Cloud for relevant memories
+ * 4. Optionally filter with Claude SDK
  * 5. Display summary to user (via systemMessage)
  * 6. Inject context for Claude (via additionalContext)
  */
 
-import { loadMemories, formatRelativeTime } from './utils/mock-store.js';
-import { searchMemories, countWords } from './utils/mock-search.js';
-import { filterAndSummarize, createFallbackResult } from './utils/sdk-filter.js';
+import { isConfigured } from './utils/config.js';
+import { searchMemories, transformSearchResults } from './utils/evermem-api.js';
+import { formatRelativeTime } from './utils/mock-store.js';
 
 const MIN_WORDS = 3;
+const MAX_MEMORIES = 5;
+
+/**
+ * Count words in a string
+ * @param {string} text
+ * @returns {number}
+ */
+function countWords(text) {
+  return text.trim().split(/\s+/).filter(w => w.length > 0).length;
+}
 
 /**
  * Main hook handler
@@ -36,37 +46,37 @@ async function main() {
       process.exit(0);
     }
 
-    // Load and search memories
-    const memories = loadMemories();
-    const candidates = searchMemories(prompt, memories);
-
-    // No matches found
-    if (candidates.length === 0) {
+    // Skip if not configured
+    if (!isConfigured()) {
       process.exit(0);
     }
 
-    // Try SDK filtering
-    let result;
-    let usedFallback = false;
-
+    // Search memories from EverMem Cloud
+    let memories = [];
     try {
-      result = await filterAndSummarize(prompt, candidates);
+      const apiResponse = await searchMemories(prompt, {
+        topK: 15,
+        retrieveMethod: 'hybrid'
+      });
+      memories = transformSearchResults(apiResponse);
     } catch (error) {
-      // Fallback to raw top-3
-      result = createFallbackResult(candidates, 3);
-      usedFallback = true;
-    }
-
-    // No relevant memories after filtering
-    if (!result.selected || result.selected.length === 0) {
+      // API error - skip silently
       process.exit(0);
     }
+
+    // No memories found
+    if (memories.length === 0) {
+      process.exit(0);
+    }
+
+    // Take top memories
+    const selectedMemories = memories.slice(0, MAX_MEMORIES);
 
     // Build context for Claude
-    const context = buildContext(result, candidates);
+    const context = buildContext(selectedMemories);
 
-    // Build display message for user (includes context text)
-    const displayMessage = buildDisplayMessage(result.selected, usedFallback, context);
+    // Build display message for user
+    const displayMessage = buildDisplayMessage(selectedMemories, context);
 
     // Output JSON with systemMessage (displays to user) and additionalContext (for Claude)
     const output = {
@@ -81,7 +91,8 @@ async function main() {
     process.exit(0);
 
   } catch (error) {
-    process.exit(0);  // Non-blocking - continue without memories
+    // Non-blocking - continue without memories
+    process.exit(0);
   }
 }
 
@@ -110,14 +121,11 @@ function readStdin() {
 /**
  * Build display message for user (shown via systemMessage)
  * @param {Object[]} memories - Selected memories
- * @param {boolean} isFallback - Whether fallback mode was used
  * @param {string} contextText - The text added to Claude's context
  * @returns {string}
  */
-function buildDisplayMessage(memories, isFallback, contextText) {
-  const header = isFallback
-    ? `📝 Memory Recall by EverMem Plugin (${memories.length} memories, fallback mode):`
-    : `📝 Memory Recall by EverMem Plugin (${memories.length} memories):`;
+function buildDisplayMessage(memories, contextText) {
+  const header = `📝 Memory Recall by EverMem Plugin (${memories.length} memories):`;
 
   const lines = [header];
 
@@ -138,19 +146,17 @@ function buildDisplayMessage(memories, isFallback, contextText) {
 
 /**
  * Build context string for Claude
- * @param {Object} result - SDK filter result
- * @param {Object[]} candidates - Original candidate memories
+ * @param {Object[]} memories - Selected memories
  * @returns {string}
  */
-function buildContext(result, candidates) {
+function buildContext(memories) {
   const lines = [];
 
   lines.push('<relevant-memories>');
   lines.push('The following memories from past sessions are relevant to the user\'s current task:');
   lines.push('');
 
-  // Add individual memories with full text
-  for (const memory of result.selected) {
+  for (const memory of memories) {
     const typeName = memory.type.replace('_', ' ');
     lines.push(`[${typeName}] ${memory.text}`);
     lines.push('');
