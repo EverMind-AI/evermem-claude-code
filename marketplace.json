@@ -1,0 +1,19 @@
+{
+  "name": "evermem",
+  "owner": {
+    "name": "EverMind AI",
+    "email": "support@evermind.ai",
+    "url": "https://evermind.ai"
+  },
+  "plugins": [
+    {
+      "name": "evermem",
+      "source": "./",
+      "description": "Automatic memory recall for Claude Code - remembers context from past sessions",
+      "version": "0.1.0",
+      "homepage": "https://evermind.ai",
+      "repository": "https://github.com/EverMind-AI/evermem-claude-code",
+      "license": "MIT"
+    }
+  ]
+}

@@ -1,0 +1,28 @@
+# Dependencies
+node_modules/
+
+# Local settings
+.claude/
+*.local.json
+*.local.md
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Test files
+testing_repo/
+
+# Build artifacts
+dist/
+*.log
+
+# Environment
+.env
+.env.*
