@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "evermem": {
+      "command": "node",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/mcp/server.js"],
+      "env": {}
+    }
+  }
+}
