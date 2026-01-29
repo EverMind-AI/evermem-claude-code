@@ -113,7 +113,25 @@ echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━�
 echo ""
 
 # Get the directory where the install script is located
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Handle both direct execution and sourcing
+if [[ -n "${BASH_SOURCE[0]}" && "${BASH_SOURCE[0]}" != "$0" ]]; then
+    SCRIPT_PATH="${BASH_SOURCE[0]}"
+else
+    SCRIPT_PATH="$0"
+fi
+# Resolve to absolute path
+if [[ "$SCRIPT_PATH" == /* ]]; then
+    SCRIPT_DIR="$(dirname "$SCRIPT_PATH")"
+else
+    SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" 2>/dev/null && pwd)"
+fi
+# Verify the marketplace.json exists
+if [[ ! -f "$SCRIPT_DIR/.claude-plugin/marketplace.json" ]]; then
+    echo -e "${RED}❌ Error: marketplace.json not found${NC}"
+    echo "Please run this script from the cloned repository directory:"
+    echo "  cd /path/to/evermem-claude-code && bash install.sh"
+    exit 1
+fi
 
 # Add marketplace from local clone
 echo "Adding EverMem marketplace..."
