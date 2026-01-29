@@ -74,11 +74,11 @@ async function main() {
       successCount++;
     } catch (error) {
       console.log(`   ❌ User message failed: ${error.message}`);
+      if (error.response) {
+        console.log(`      Response: ${JSON.stringify(error.response)}`);
+      }
       failCount++;
     }
-
-    // Delay between requests
-    await sleep(2000);
 
     // Save assistant message
     try {
@@ -91,21 +91,17 @@ async function main() {
       successCount++;
     } catch (error) {
       console.log(`   ❌ Assistant message failed: ${error.message}`);
+      if (error.response) {
+        console.log(`      Response: ${JSON.stringify(error.response)}`);
+      }
       failCount++;
     }
-
-    // Delay between conversations
-    await sleep(3000);
   }
 
   console.log('\n' + '=' .repeat(50));
   console.log(`\n✅ Done! ${successCount} saved, ${failCount} failed`);
   console.log('\nNow run the retrieval test:');
   console.log('   node scripts/test-retrieve-memories.js');
-}
-
-function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 main().catch(error => {

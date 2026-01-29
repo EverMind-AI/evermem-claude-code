@@ -43,11 +43,13 @@ async function main() {
 
     // Skip short prompts
     if (countWords(prompt) < MIN_WORDS) {
+      outputMessage(`⏭️ EverMem: Skipped (prompt too short: ${countWords(prompt)} words)`);
       process.exit(0);
     }
 
     // Skip if not configured
     if (!isConfigured()) {
+      outputMessage('⚠️ EverMem: API key not configured. Set EVERMEM_API_KEY environment variable.');
       process.exit(0);
     }
 
@@ -60,12 +62,13 @@ async function main() {
       });
       memories = transformSearchResults(apiResponse);
     } catch (error) {
-      // API error - skip silently
+      outputMessage(`❌ EverMem: API error - ${error.message}`);
       process.exit(0);
     }
 
     // No memories found
     if (memories.length === 0) {
+      outputMessage('🔍 EverMem: No relevant memories found');
       process.exit(0);
     }
 
@@ -91,9 +94,18 @@ async function main() {
     process.exit(0);
 
   } catch (error) {
-    // Non-blocking - continue without memories
+    outputMessage(`❌ EverMem: Hook error - ${error.message}`);
     process.exit(0);
   }
+}
+
+/**
+ * Output a system message to the user
+ * @param {string} message - Message to display
+ */
+function outputMessage(message) {
+  const output = { systemMessage: message };
+  process.stdout.write(JSON.stringify(output));
 }
 
 /**

@@ -32,29 +32,34 @@ export async function searchMemories(query, options = {}) {
   const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
   try {
-    const response = await fetch(`${config.apiBaseUrl}/api/v1/memories/search`, {
+    // Build query params for GET request
+    const params = new URLSearchParams({
+      query,
+      user_id: config.userId,
+      retrieve_method: retrieveMethod,
+      top_k: String(topK),
+      include_metadata: 'true'
+    });
+    if (config.groupId) {
+      params.append('group_id', config.groupId);
+    }
+    for (const memType of memoryTypes) {
+      params.append('memory_types', memType);
+    }
+
+    const response = await fetch(`${config.apiBaseUrl}/api/v1/memories/search?${params.toString()}`, {
       method: 'GET',
       headers: {
-        'Authorization': `Bearer ${config.apiKey}`,
-        'Content-Type': 'application/json'
+        'Authorization': `Bearer ${config.apiKey}`
       },
-      body: JSON.stringify({
-        query,
-        user_id: config.userId,
-        group_id: config.groupId,
-        memory_types: memoryTypes,
-        retrieve_method: retrieveMethod,
-        top_k: topK,
-        include_metadata: true
-      }),
       signal: controller.signal
     });
 
     clearTimeout(timeoutId);
 
     if (!response.ok) {
-      const error = await response.json().catch(() => ({}));
-      throw new Error(error.message || `API error: ${response.status}`);
+      const errorBody = await response.text().catch(() => '');
+      throw new Error(`API error ${response.status}: ${errorBody}`);
     }
 
     const data = await response.json();
@@ -63,7 +68,7 @@ export async function searchMemories(query, options = {}) {
     clearTimeout(timeoutId);
 
     if (error.name === 'AbortError') {
-      throw new Error('API timeout');
+      throw new Error(`API timeout after ${TIMEOUT_MS}ms`);
     }
     throw error;
   }
@@ -75,33 +80,58 @@ export async function searchMemories(query, options = {}) {
  * @returns {Object[]} Formatted memories
  */
 export function transformSearchResults(apiResponse) {
-  if (!apiResponse?.result?.memories) {
+  if (!apiResponse?.result) {
     return [];
   }
 
   const memories = [];
-  const memoryGroups = apiResponse.result.memories;
-  const scores = apiResponse.result.scores || [];
+  const result = apiResponse.result;
+  const memoryGroups = result.memories || [];
+  const originalData = result.original_data || [];
+  const scoreGroups = result.scores || [];
 
-  // Flatten memory groups
+  // Iterate through memory groups and match with original_data for content
   for (let i = 0; i < memoryGroups.length; i++) {
-    const group = memoryGroups[i];
-    const groupScores = scores[i] || {};
+    const memoryGroup = memoryGroups[i];
+    const dataGroup = originalData[i] || {};
+    const scoresForGroup = scoreGroups[i] || {};
 
-    // Handle different memory type structures
-    for (const [type, items] of Object.entries(group)) {
-      if (!Array.isArray(items)) continue;
+    // Each group is keyed by group_id
+    for (const [groupId, memoryItems] of Object.entries(memoryGroup)) {
+      if (!Array.isArray(memoryItems)) continue;
 
-      const typeScores = groupScores[type] || [];
+      const dataItems = dataGroup[groupId] || [];
+      const scores = scoresForGroup[groupId] || [];
 
-      for (let j = 0; j < items.length; j++) {
-        const item = items[j];
+      for (let j = 0; j < memoryItems.length; j++) {
+        const memoryMeta = memoryItems[j];
+        const dataItem = dataItems[j];
+        const score = scores[j] || 0;
+
+        // Extract content from original_data
+        let content = '';
+        if (dataItem?.messages && Array.isArray(dataItem.messages)) {
+          // Combine all messages in the conversation
+          content = dataItem.messages
+            .map(msg => msg.content)
+            .filter(Boolean)
+            .join('\n\n');
+        } else if (dataItem?.content) {
+          content = dataItem.content;
+        }
+
+        if (!content) continue;
+
         memories.push({
-          text: item.content || item.text || JSON.stringify(item),
-          timestamp: item.created_at || item.timestamp || new Date().toISOString(),
-          type: mapMemoryType(type),
-          score: typeScores[j] || 0,
-          metadata: item.metadata || {}
+          text: content,
+          timestamp: memoryMeta.timestamp || new Date().toISOString(),
+          type: mapMemoryType(memoryMeta.memory_type),
+          score: score,
+          metadata: {
+            groupId: memoryMeta.group_id,
+            type: memoryMeta.type,
+            participants: memoryMeta.participants
+          }
         });
       }
     }
@@ -169,8 +199,8 @@ export async function addMemory(message) {
     clearTimeout(timeoutId);
 
     if (!response.ok) {
-      const error = await response.json().catch(() => ({}));
-      throw new Error(error.message || `API error: ${response.status}`);
+      const errorBody = await response.text().catch(() => '');
+      throw new Error(`API error ${response.status}: ${errorBody}`);
     }
 
     return await response.json();
@@ -178,7 +208,7 @@ export async function addMemory(message) {
     clearTimeout(timeoutId);
 
     if (error.name === 'AbortError') {
-      throw new Error('API timeout');
+      throw new Error(`API timeout after ${TIMEOUT_MS}ms`);
     }
     throw error;
   }

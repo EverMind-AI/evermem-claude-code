@@ -29,3 +29,4 @@ dist/
 # Environment
 .env
 .env.*
+testing_repo/

@@ -82,19 +82,12 @@ async function main() {
     } catch (error) {
       console.log(`   ❌ Error: ${error.message}`);
     }
-
-    // Delay between queries
-    await sleep(2000);
   }
 
   console.log('\n' + '=' .repeat(60));
   console.log('\n✅ Retrieval test complete!');
   console.log('\nTo test in Claude Code:');
   console.log('   claude --plugin-dir /Users/hzh/code/memory-plugin');
-}
-
-function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 main().catch(error => {
