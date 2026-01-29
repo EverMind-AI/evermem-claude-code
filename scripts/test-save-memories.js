@@ -77,8 +77,8 @@ async function main() {
       failCount++;
     }
 
-    // Small delay between requests
-    await sleep(500);
+    // Delay between requests
+    await sleep(2000);
 
     // Save assistant message
     try {
@@ -95,7 +95,7 @@ async function main() {
     }
 
     // Delay between conversations
-    await sleep(1000);
+    await sleep(3000);
   }
 
   console.log('\n' + '=' .repeat(50));

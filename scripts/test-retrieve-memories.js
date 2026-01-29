@@ -84,7 +84,7 @@ async function main() {
     }
 
     // Delay between queries
-    await sleep(500);
+    await sleep(2000);
   }
 
   console.log('\n' + '=' .repeat(60));

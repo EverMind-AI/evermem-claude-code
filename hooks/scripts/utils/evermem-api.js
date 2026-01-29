@@ -5,7 +5,7 @@
 
 import { getConfig } from './config.js';
 
-const TIMEOUT_MS = 5000;
+const TIMEOUT_MS = 30000; // 30 seconds
 
 /**
  * Search memories from EverMem Cloud
