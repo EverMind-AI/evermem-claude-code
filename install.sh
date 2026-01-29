@@ -117,9 +117,10 @@ PLUGIN_DIR="$HOME/.evermem"
 
 # Check if we're running from a cloned repo or via curl
 SCRIPT_DIR=""
-if [[ -n "${BASH_SOURCE[0]}" && "${BASH_SOURCE[0]}" != "bash" ]]; then
+# BASH_SOURCE[0] is empty when running via 'bash -c' (curl pipe)
+if [[ -n "${BASH_SOURCE[0]}" ]]; then
     POSSIBLE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
-    if [[ -f "$POSSIBLE_DIR/.claude-plugin/marketplace.json" ]]; then
+    if [[ -n "$POSSIBLE_DIR" && -f "$POSSIBLE_DIR/.claude-plugin/marketplace.json" ]]; then
         SCRIPT_DIR="$POSSIBLE_DIR"
     fi
 fi
