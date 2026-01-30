@@ -4,8 +4,23 @@
  */
 
 import { getConfig } from './config.js';
+import { appendFileSync } from 'fs';
+import { homedir } from 'os';
+import { join } from 'path';
 
 const TIMEOUT_MS = 30000; // 30 seconds
+const DEBUG = process.env.EVERMEM_DEBUG === '1';
+const LOG_FILE = join(homedir(), '.evermem-debug.log');
+
+function debugLog(msg, data = null) {
+  if (!DEBUG) return;
+  const timestamp = new Date().toISOString();
+  let line = `[${timestamp}] [API] ${msg}`;
+  if (data !== null) {
+    line += `: ${typeof data === 'string' ? data : JSON.stringify(data, null, 2)}`;
+  }
+  appendFileSync(LOG_FILE, line + '\n');
+}
 
 /**
  * Search memories from EverMem Cloud
@@ -169,43 +184,76 @@ function mapMemoryType(apiType) {
 export async function addMemory(message) {
   const config = getConfig();
 
+  debugLog('addMemory called', {
+    role: message.role,
+    contentLength: message.content?.length,
+    messageId: message.messageId
+  });
+
   if (!config.isConfigured) {
+    debugLog('addMemory: Not configured');
     throw new Error('EverMem API key not configured');
   }
+
+  debugLog('addMemory config', {
+    apiBaseUrl: config.apiBaseUrl,
+    userId: config.userId,
+    groupId: config.groupId,
+    hasApiKey: !!config.apiKey
+  });
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
+  const requestBody = {
+    message_id: message.messageId || generateMessageId(),
+    create_time: new Date().toISOString(),
+    sender: config.userId,
+    sender_name: message.role === 'assistant' ? 'Claude' : 'User',
+    role: message.role || 'user',
+    content: message.content,
+    group_id: config.groupId,
+    group_name: 'Claude Code Session'
+  };
+
+  debugLog('addMemory request body', {
+    message_id: requestBody.message_id,
+    sender: requestBody.sender,
+    role: requestBody.role,
+    group_id: requestBody.group_id,
+    contentPreview: requestBody.content?.substring(0, 100)
+  });
+
   try {
-    const response = await fetch(`${config.apiBaseUrl}/api/v1/memories`, {
+    const url = `${config.apiBaseUrl}/api/v1/memories`;
+    debugLog('addMemory POST', url);
+
+    const response = await fetch(url, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${config.apiKey}`,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({
-        message_id: message.messageId || generateMessageId(),
-        create_time: new Date().toISOString(),
-        sender: config.userId,
-        sender_name: message.role === 'assistant' ? 'Claude' : 'User',
-        role: message.role || 'user',
-        content: message.content,
-        group_id: config.groupId,
-        group_name: 'Claude Code Session'
-      }),
+      body: JSON.stringify(requestBody),
       signal: controller.signal
     });
 
     clearTimeout(timeoutId);
 
+    debugLog('addMemory response status', response.status);
+
     if (!response.ok) {
       const errorBody = await response.text().catch(() => '');
+      debugLog('addMemory error response', errorBody);
       throw new Error(`API error ${response.status}: ${errorBody}`);
     }
 
-    return await response.json();
+    const result = await response.json();
+    debugLog('addMemory success', result);
+    return result;
   } catch (error) {
     clearTimeout(timeoutId);
+    debugLog('addMemory exception', error.message);
 
     if (error.name === 'AbortError') {
       throw new Error(`API timeout after ${TIMEOUT_MS}ms`);
