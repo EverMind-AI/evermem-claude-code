@@ -11,7 +11,7 @@
  * 2. Read transcript file to get messages
  * 3. Extract user message and assistant response
  * 4. Send to EverMem Cloud for storage
- * 5. Exit silently (non-blocking)
+ * 5. Display status to user
  */
 
 import { isConfigured } from './utils/config.js';
@@ -22,6 +22,9 @@ import { join } from 'path';
 
 const DEBUG = process.env.EVERMEM_DEBUG === '1';
 const LOG_FILE = join(homedir(), '.evermem-debug.log');
+
+// Collect messages to display at the end
+const terminalMessages = [];
 
 function debugLog(msg, data = null) {
   if (!DEBUG) return;
@@ -34,15 +37,34 @@ function debugLog(msg, data = null) {
 }
 
 /**
+ * Output a system message to the terminal
+ * @param {string} message - Message to display
+ */
+function outputMessage(message) {
+  const output = { systemMessage: message };
+  process.stdout.write(JSON.stringify(output));
+}
+
+/**
+ * Add a message to be displayed later
+ * @param {string} message
+ */
+function addTerminalMessage(message) {
+  terminalMessages.push(message);
+}
+
+/**
  * Main hook handler
  */
 async function main() {
   try {
     debugLog('Stop hook started');
+    addTerminalMessage('💾 EverMem: Saving session memories...');
 
     // Skip if not configured
     if (!isConfigured()) {
       debugLog('Not configured, skipping');
+      outputMessage('⚠️ EverMem: API key not configured, skipping memory save');
       process.exit(0);
     }
 
@@ -59,6 +81,7 @@ async function main() {
 
     if (!transcriptPath || !existsSync(transcriptPath)) {
       debugLog('Transcript file not found');
+      outputMessage('⚠️ EverMem: No transcript found, skipping memory save');
       process.exit(0);
     }
 
@@ -82,6 +105,7 @@ async function main() {
 
     if (messages.length === 0) {
       debugLog('No messages found in transcript');
+      outputMessage('ℹ️ EverMem: No messages to save');
       process.exit(0);
     }
 
@@ -96,48 +120,68 @@ async function main() {
 
     if (!lastMessages.user && !lastMessages.assistant) {
       debugLog('No user or assistant messages extracted');
+      outputMessage('ℹ️ EverMem: No user/assistant messages to save');
       process.exit(0);
     }
 
-    // Store messages to EverMem Cloud (fire and forget)
-    const promises = [];
+    // Store messages to EverMem Cloud
+    const results = { user: null, assistant: null };
+    const errors = [];
 
     if (lastMessages.user) {
-      debugLog('Storing user message', lastMessages.user.content.substring(0, 100));
-      promises.push(
-        addMemory({
+      const preview = lastMessages.user.content.substring(0, 50);
+      debugLog('Storing user message', preview);
+      try {
+        await addMemory({
           content: lastMessages.user.content,
           role: 'user',
           messageId: `user_${Date.now()}`
-        }).then(() => debugLog('User message stored successfully'))
-          .catch((err) => debugLog('User message store error', err.message))
-      );
+        });
+        results.user = true;
+        debugLog('User message stored successfully');
+      } catch (err) {
+        results.user = false;
+        errors.push(`user: ${err.message}`);
+        debugLog('User message store error', err.message);
+      }
     }
 
     if (lastMessages.assistant) {
-      debugLog('Storing assistant message', lastMessages.assistant.content.substring(0, 100));
-      promises.push(
-        addMemory({
+      const preview = lastMessages.assistant.content.substring(0, 50);
+      debugLog('Storing assistant message', preview);
+      try {
+        await addMemory({
           content: lastMessages.assistant.content,
           role: 'assistant',
           messageId: `assistant_${Date.now()}`
-        }).then(() => debugLog('Assistant message stored successfully'))
-          .catch((err) => debugLog('Assistant message store error', err.message))
-      );
+        });
+        results.assistant = true;
+        debugLog('Assistant message stored successfully');
+      } catch (err) {
+        results.assistant = false;
+        errors.push(`assistant: ${err.message}`);
+        debugLog('Assistant message store error', err.message);
+      }
     }
 
-    // Wait for all storage operations (with timeout)
-    await Promise.race([
-      Promise.all(promises),
-      new Promise(resolve => setTimeout(resolve, 3000))
-    ]);
+    // Build final status message
+    const saved = [];
+    if (results.user === true) saved.push('user');
+    if (results.assistant === true) saved.push('assistant');
+
+    if (saved.length > 0) {
+      const msg = `✅ EverMem: Saved ${saved.join(' + ')} message${saved.length > 1 ? 's' : ''} to memory`;
+      outputMessage(msg);
+    } else if (errors.length > 0) {
+      outputMessage(`❌ EverMem: Failed to save - ${errors.join(', ')}`);
+    }
 
     debugLog('Stop hook completed');
     process.exit(0);
 
   } catch (error) {
     debugLog('Stop hook error', error.message);
-    // Non-blocking - exit silently
+    outputMessage(`❌ EverMem: Error - ${error.message}`);
     process.exit(0);
   }
 }
