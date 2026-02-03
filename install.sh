@@ -64,18 +64,31 @@ echo ""
 echo "Get your API key from: https://console.evermind.ai/"
 echo ""
 
+# Function to read user input (works when piped from curl)
+prompt_user() {
+    local prompt="$1"
+    local varname="$2"
+    printf "%s" "$prompt"
+    # Try /dev/tty first (needed when script is piped), fall back to stdin
+    if [ -e /dev/tty ] && (exec </dev/tty) 2>/dev/null; then
+        read "$varname" </dev/tty
+    else
+        read "$varname"
+    fi
+}
+
 # Check if API key already exists
 if [ -n "$EVERMEM_API_KEY" ]; then
     echo -e "${GREEN}✓${NC} EVERMEM_API_KEY already set in environment"
-    read -p "Do you want to update it? (y/N): " UPDATE_KEY </dev/tty
+    prompt_user "Do you want to update it? (y/N): " UPDATE_KEY
     if [ "$UPDATE_KEY" != "y" ] && [ "$UPDATE_KEY" != "Y" ]; then
         echo "Keeping existing API key."
         API_KEY="$EVERMEM_API_KEY"
     else
-        read -p "Enter your EverMem API key: " API_KEY </dev/tty
+        prompt_user "Enter your EverMem API key: " API_KEY
     fi
 else
-    read -p "Enter your EverMem API key: " API_KEY </dev/tty
+    prompt_user "Enter your EverMem API key: " API_KEY
 fi
 
 if [ -z "$API_KEY" ]; then
