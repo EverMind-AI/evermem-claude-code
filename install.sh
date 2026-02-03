@@ -67,15 +67,15 @@ echo ""
 # Check if API key already exists
 if [ -n "$EVERMEM_API_KEY" ]; then
     echo -e "${GREEN}✓${NC} EVERMEM_API_KEY already set in environment"
-    read -p "Do you want to update it? (y/N): " UPDATE_KEY
+    read -p "Do you want to update it? (y/N): " UPDATE_KEY </dev/tty
     if [ "$UPDATE_KEY" != "y" ] && [ "$UPDATE_KEY" != "Y" ]; then
         echo "Keeping existing API key."
         API_KEY="$EVERMEM_API_KEY"
     else
-        read -p "Enter your EverMem API key: " API_KEY
+        read -p "Enter your EverMem API key: " API_KEY </dev/tty
     fi
 else
-    read -p "Enter your EverMem API key: " API_KEY
+    read -p "Enter your EverMem API key: " API_KEY </dev/tty
 fi
 
 if [ -z "$API_KEY" ]; then
