@@ -1,5 +1,4 @@
 ---
-name: search
 description: Search EverMem for relevant memories from past sessions
 arguments:
   - name: query

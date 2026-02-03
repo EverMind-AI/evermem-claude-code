@@ -41,9 +41,8 @@ async function main() {
     const data = JSON.parse(input);
     const prompt = data.prompt || '';
 
-    // Skip short prompts
+    // Skip short prompts silently
     if (countWords(prompt) < MIN_WORDS) {
-      outputMessage(`⏭️ EverMem: Skipped (prompt too short: ${countWords(prompt)} words)`);
       process.exit(0);
     }
 
@@ -55,8 +54,9 @@ async function main() {
 
     // Search memories from EverMem Cloud
     let memories = [];
+    let apiResponse = null;
     try {
-      const apiResponse = await searchMemories(prompt, {
+      apiResponse = await searchMemories(prompt, {
         topK: 15,
         retrieveMethod: 'hybrid'
       });
@@ -66,9 +66,19 @@ async function main() {
       process.exit(0);
     }
 
-    // No memories found
+    // Debug: show what we got
+    const debugInfo = `[DEBUG] API returned ${JSON.stringify(apiResponse).length} bytes, transformed to ${memories.length} memories`;
+    if (memories.length === 0 && apiResponse) {
+      // Show raw response structure when no memories found
+      const keys = apiResponse.result ? Object.keys(apiResponse.result) : Object.keys(apiResponse);
+      const curlUsed = apiResponse._debug?.curl || 'N/A';
+      const reqBody = apiResponse._debug?.requestBody ? JSON.stringify(apiResponse._debug.requestBody) : 'N/A';
+      outputMessage(`🔍 EverMem: No relevant memories found\n${debugInfo}\nCurl: ${curlUsed}\nRequest body: ${reqBody}\nAPI keys: ${keys.join(', ')}\nRaw: ${JSON.stringify(apiResponse).substring(0, 300)}...`);
+      process.exit(0);
+    }
+
+    // No memories found (without debug - handled above with debug info)
     if (memories.length === 0) {
-      outputMessage('🔍 EverMem: No relevant memories found');
       process.exit(0);
     }
 
@@ -79,7 +89,7 @@ async function main() {
     const context = buildContext(selectedMemories);
 
     // Build display message for user
-    const displayMessage = buildDisplayMessage(selectedMemories, context);
+    const displayMessage = buildDisplayMessage(selectedMemories);
 
     // Output JSON with systemMessage (displays to user) and additionalContext (for Claude)
     const output = {
@@ -133,25 +143,22 @@ function readStdin() {
 /**
  * Build display message for user (shown via systemMessage)
  * @param {Object[]} memories - Selected memories
- * @param {string} contextText - The text added to Claude's context
  * @returns {string}
  */
-function buildDisplayMessage(memories, contextText) {
+function buildDisplayMessage(memories) {
   const header = `📝 Memory Recall by EverMem Plugin (${memories.length} memories):`;
 
   const lines = [header];
 
   for (const memory of memories) {
     const relTime = formatRelativeTime(memory.timestamp);
-    const shortText = memory.text.length > 80
-      ? memory.text.slice(0, 80) + '...'
-      : memory.text;
-    lines.push(`  • (${relTime}) ${shortText}`);
+    const score = memory.score ? memory.score.toFixed(2) : '0.00';
+    // Use subject as title if available, otherwise truncate text
+    const title = memory.subject
+      ? memory.subject
+      : (memory.text.length > 60 ? memory.text.slice(0, 60) + '...' : memory.text);
+    lines.push(`  • [${score}] (${relTime}) ${title}`);
   }
-
-  lines.push('');
-  lines.push('Added to context:');
-  lines.push(contextText);
 
   return lines.join('\n');
 }
@@ -169,8 +176,7 @@ function buildContext(memories) {
   lines.push('');
 
   for (const memory of memories) {
-    const typeName = memory.type.replace('_', ' ');
-    lines.push(`[${typeName}] ${memory.text}`);
+    lines.push(memory.text);
     lines.push('');
   }
 

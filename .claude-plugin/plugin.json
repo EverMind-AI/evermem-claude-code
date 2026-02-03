@@ -5,7 +5,10 @@
   "author": {
     "name": "EverMem"
   },
+  "logo": "./assets/logo.png",
   "keywords": ["memory", "context", "recall", "persistence"],
   "commands": "./commands",
-  "skills": "./skills"
+  "skills": "./skills",
+  "hooks": "./hooks",
+  "assets": ["./assets", "./server"]
 }

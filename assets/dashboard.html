@@ -1,0 +1,1118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EverMem - Memory Hub</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0d1117;
+      color: #c9d1d9;
+      min-height: 100vh;
+    }
+    #header {
+      padding: 16px 24px;
+      border-bottom: 1px solid #30363d;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      background: rgba(13, 17, 23, 0.95);
+      backdrop-filter: blur(10px);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      flex-wrap: wrap;
+    }
+    #header h1 { font-size: 18px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+    #header .stats {
+      font-size: 13px;
+      color: #8b949e;
+      margin-left: auto;
+    }
+    .header-controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .api-input, .search-input, .filter-select {
+      padding: 6px 12px;
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      color: #c9d1d9;
+      font-size: 13px;
+    }
+    .api-input { width: 180px; }
+    .search-input { width: 200px; }
+    .filter-select { min-width: 120px; cursor: pointer; }
+    .api-input:focus, .search-input:focus, .filter-select:focus {
+      outline: none;
+      border-color: #58a6ff;
+    }
+    .api-btn, .refresh-btn {
+      padding: 6px 12px;
+      background: #238636;
+      border: none;
+      border-radius: 6px;
+      color: #fff;
+      font-size: 13px;
+      cursor: pointer;
+      transition: background 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .api-btn:hover, .refresh-btn:hover { background: #2ea043; }
+    .api-btn:disabled, .refresh-btn:disabled { background: #30363d; cursor: not-allowed; }
+    .refresh-btn { background: #30363d; }
+    .refresh-btn:hover { background: #3d444d; }
+    .refresh-btn.spinning svg { animation: spin 1s linear infinite; }
+
+    #progress-view {
+      width: 100%;
+      padding: 24px;
+      overflow-y: auto;
+    }
+    .progress-container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    .loading-message {
+      text-align: center;
+      padding: 60px 20px;
+      color: #8b949e;
+      font-size: 14px;
+    }
+    .loading-message .spinner {
+      width: 32px;
+      height: 32px;
+      border: 3px solid #30363d;
+      border-top-color: #58a6ff;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 16px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .error-message {
+      background: #f8514922;
+      border: 1px solid #f85149;
+      border-radius: 8px;
+      padding: 16px;
+      color: #f85149;
+      margin-bottom: 24px;
+    }
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin-bottom: 32px;
+    }
+    @media (max-width: 768px) {
+      .stats-grid { grid-template-columns: repeat(2, 1fr); }
+      #header { flex-direction: column; align-items: flex-start; }
+      .header-controls { flex-wrap: wrap; }
+    }
+    .stat-card {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      padding: 20px;
+    }
+    .stat-card .label {
+      font-size: 12px;
+      color: #8b949e;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+    }
+    .stat-card .value {
+      font-size: 32px;
+      font-weight: 600;
+      color: #f0f6fc;
+    }
+    .stat-card .trend {
+      font-size: 12px;
+      color: #3fb950;
+      margin-top: 4px;
+    }
+    .stat-card .trend.neutral { color: #8b949e; }
+
+    /* Heatmap - GitHub style */
+    .heatmap-section {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 32px;
+      overflow-x: auto;
+    }
+    .section-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #f0f6fc;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .heatmap-months {
+      position: relative;
+      font-size: 11px;
+      color: #8b949e;
+      margin-bottom: 8px;
+      margin-left: 36px;
+      height: 16px;
+    }
+    .heatmap-months span {
+      position: absolute;
+    }
+    .heatmap-body {
+      display: flex;
+      gap: 4px;
+    }
+    .heatmap-days {
+      display: flex;
+      flex-direction: column;
+      font-size: 11px;
+      color: #8b949e;
+      width: 32px;
+      padding-top: 2px;
+    }
+    .heatmap-days span {
+      height: 13px;
+      line-height: 13px;
+    }
+    .heatmap-grid {
+      display: flex;
+      gap: 3px;
+    }
+    .heatmap-week {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+    .heatmap-cell {
+      width: 13px;
+      height: 13px;
+      border-radius: 2px;
+      background: #161b22;
+      border: 1px solid #21262d;
+      cursor: pointer;
+      transition: transform 0.1s;
+      position: relative;
+    }
+    .heatmap-cell:hover { transform: scale(1.3); z-index: 10; }
+    .heatmap-cell.level-1 { background: #0e4429; border-color: #0e4429; }
+    .heatmap-cell.level-2 { background: #006d32; border-color: #006d32; }
+    .heatmap-cell.level-3 { background: #26a641; border-color: #26a641; }
+    .heatmap-cell.level-4 { background: #39d353; border-color: #39d353; }
+    .heatmap-tooltip {
+      position: fixed;
+      background: #1c2128;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      padding: 8px 12px;
+      font-size: 12px;
+      color: #c9d1d9;
+      pointer-events: none;
+      z-index: 1000;
+      white-space: nowrap;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+      display: none;
+    }
+    .heatmap-tooltip strong {
+      color: #f0f6fc;
+    }
+    .heatmap-legend {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 4px;
+      margin-top: 12px;
+      font-size: 11px;
+      color: #8b949e;
+    }
+    .heatmap-legend-cell { width: 12px; height: 12px; border-radius: 2px; }
+
+    .growth-section {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 32px;
+    }
+    .growth-chart {
+      display: flex;
+      align-items: flex-end;
+      gap: 8px;
+      height: 150px;
+      padding: 0 8px;
+    }
+    .chart-bar-container {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      height: 100%;
+    }
+    .chart-bar-wrapper {
+      flex: 1;
+      width: 100%;
+      display: flex;
+      align-items: flex-end;
+    }
+    .chart-bar {
+      width: 100%;
+      background: linear-gradient(to top, #238636, #3fb950);
+      border-radius: 4px 4px 0 0;
+      min-height: 4px;
+      transition: height 0.3s ease;
+      position: relative;
+    }
+    .chart-bar:hover { filter: brightness(1.2); }
+    .chart-bar .bar-tooltip {
+      position: absolute;
+      bottom: calc(100% + 8px);
+      left: 50%;
+      transform: translateX(-50%);
+      background: #0d1117;
+      border: 1px solid #30363d;
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-size: 11px;
+      white-space: nowrap;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s;
+      z-index: 10;
+    }
+    .chart-bar:hover .bar-tooltip { opacity: 1; }
+    .chart-label { font-size: 10px; color: #8b949e; margin-top: 8px; }
+
+    .timeline-section { margin-bottom: 32px; }
+    .timeline { position: relative; padding-left: 32px; }
+    .timeline::before {
+      content: '';
+      position: absolute;
+      left: 7px;
+      top: 0;
+      bottom: 0;
+      width: 2px;
+      background: #30363d;
+    }
+    .timeline-day { position: relative; margin-bottom: 24px; }
+    .timeline-day:last-child { margin-bottom: 0; }
+    .timeline-day.hidden { display: none; }
+    .timeline-dot {
+      position: absolute;
+      left: -32px;
+      top: 4px;
+      width: 16px;
+      height: 16px;
+      background: #238636;
+      border: 3px solid #0d1117;
+      border-radius: 50%;
+      z-index: 1;
+    }
+    .timeline-dot.today {
+      background: #58a6ff;
+      box-shadow: 0 0 12px rgba(88, 166, 255, 0.4);
+    }
+    .timeline-dot.highlighted {
+      background: #f0883e;
+      box-shadow: 0 0 12px rgba(240, 136, 62, 0.4);
+    }
+    .day-header { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+    .day-date { font-size: 14px; font-weight: 600; color: #f0f6fc; }
+    .day-badge {
+      font-size: 11px;
+      padding: 2px 8px;
+      background: #388bfd22;
+      color: #58a6ff;
+      border-radius: 10px;
+    }
+    .day-stats { font-size: 12px; color: #8b949e; }
+    .memory-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 12px;
+    }
+    .memory-card {
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 14px;
+      transition: border-color 0.2s, transform 0.2s;
+      cursor: pointer;
+    }
+    .memory-card:hover { border-color: #58a6ff; transform: translateY(-2px); }
+    .memory-card.hidden { display: none; }
+    .memory-card-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+    .memory-type-dot { width: 8px; height: 8px; border-radius: 50%; }
+    .memory-label { font-size: 13px; font-weight: 500; color: #f0f6fc; flex: 1; }
+    .memory-time { font-size: 11px; color: #8b949e; }
+    .memory-project { font-size: 11px; color: #8b949e; margin-bottom: 6px; font-family: monospace; }
+    .memory-content {
+      font-size: 12px;
+      color: #8b949e;
+      line-height: 1.5;
+      max-height: 100px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: #8b949e;
+    }
+    .empty-state h3 {
+      font-size: 18px;
+      color: #f0f6fc;
+      margin-bottom: 8px;
+    }
+    .no-results {
+      text-align: center;
+      padding: 40px 20px;
+      color: #8b949e;
+      font-size: 14px;
+    }
+
+    /* Modal */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.2s, visibility 0.2s;
+    }
+    .modal-overlay.visible {
+      opacity: 1;
+      visibility: visible;
+    }
+    .modal {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      max-width: 700px;
+      width: 90%;
+      max-height: 80vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      transform: scale(0.95);
+      transition: transform 0.2s;
+    }
+    .modal-overlay.visible .modal {
+      transform: scale(1);
+    }
+    .modal-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid #30363d;
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+    }
+    .modal-header-content { flex: 1; }
+    .modal-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: #f0f6fc;
+      margin-bottom: 4px;
+    }
+    .modal-meta {
+      font-size: 12px;
+      color: #8b949e;
+    }
+    .modal-close {
+      background: none;
+      border: none;
+      color: #8b949e;
+      cursor: pointer;
+      padding: 4px;
+      border-radius: 4px;
+      transition: color 0.2s, background 0.2s;
+    }
+    .modal-close:hover {
+      color: #f0f6fc;
+      background: #30363d;
+    }
+    .modal-body {
+      padding: 20px;
+      overflow-y: auto;
+      flex: 1;
+    }
+    .modal-content {
+      font-size: 14px;
+      color: #c9d1d9;
+      line-height: 1.7;
+      white-space: pre-wrap;
+    }
+  </style>
+</head>
+<body>
+  <div id="header">
+    <h1>
+      <img src="/logo.png" alt="EverMem" style="width: 24px; height: 24px; border-radius: 4px;" onerror="this.style.display='none'" />
+      EverMem Memory Hub
+    </h1>
+    <div class="header-controls">
+      <label style="font-size: 12px; color: #8b949e;">API Key:</label>
+      <input type="password" id="api-key-input" class="api-input" placeholder="Enter your EverMem API key" />
+      <button id="load-btn" class="api-btn" onclick="loadData()">Load</button>
+      <button id="refresh-btn" class="refresh-btn" onclick="refreshData()" title="Refresh" style="display: none;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M23 4v6h-6M1 20v-6h6"/>
+          <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
+        </svg>
+      </button>
+      <input type="text" id="search-input" class="search-input" placeholder="Search memories..." style="display: none;" oninput="filterMemories()" />
+      <select id="project-filter" class="filter-select" style="display: none;" onchange="filterMemories()">
+        <option value="">All Projects</option>
+      </select>
+    </div>
+    <span class="stats" id="stats">Enter API key to load memories</span>
+  </div>
+
+  <div id="progress-view">
+    <div class="progress-container">
+      <div id="content">
+        <div class="empty-state">
+          <h3>Welcome to EverMem Memory Hub</h3>
+          <p>Enter your EverMem API key above to view your memory statistics and timeline.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal for full memory view -->
+  <div id="modal-overlay" class="modal-overlay" onclick="closeModal(event)">
+    <div class="modal" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <div class="modal-header-content">
+          <div class="modal-title" id="modal-title"></div>
+          <div class="modal-meta" id="modal-meta"></div>
+        </div>
+        <button class="modal-close" onclick="closeModal()">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M18 6L6 18M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-content" id="modal-content"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const PROXY_URL = window.location.protocol === 'file:' ? 'http://localhost:3456' : '';
+    let memories = [];
+    let filteredMemories = [];
+    let apiKey = '';
+    let proxyAvailable = false;
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const hashParams = new URLSearchParams(window.location.hash.slice(1));
+    const keyFromUrl = urlParams.get('key') || urlParams.get('apiKey') || hashParams.get('key') || hashParams.get('apiKey');
+
+    async function checkProxy() {
+      try {
+        const response = await fetch(`${PROXY_URL}/health`, { method: 'GET' });
+        proxyAvailable = response.ok;
+      } catch {
+        proxyAvailable = false;
+      }
+
+      if (!proxyAvailable) {
+        document.getElementById('content').innerHTML = `
+          <div class="error-message">
+            <strong>Server not running</strong>
+            <p style="margin-top: 8px; color: #c9d1d9;">The Memory Hub requires a local server to communicate with the EverMind API.</p>
+            <p style="margin-top: 8px; color: #8b949e;">Start the server with:</p>
+            <pre style="margin-top: 8px; padding: 12px; background: #0d1117; border-radius: 6px; font-family: monospace; color: #58a6ff;">node server/proxy.js</pre>
+            <p style="margin-top: 8px; color: #8b949e;">Then refresh this page.</p>
+          </div>
+        `;
+        document.getElementById('load-btn').disabled = true;
+        return;
+      }
+
+      if (keyFromUrl) {
+        document.getElementById('api-key-input').value = keyFromUrl;
+        setTimeout(() => loadData(), 100);
+      }
+    }
+
+    checkProxy();
+
+    async function loadData() {
+      if (!proxyAvailable) {
+        alert('Server not running. Please start it first.');
+        return;
+      }
+
+      apiKey = document.getElementById('api-key-input').value.trim();
+      if (!apiKey) {
+        alert('Please enter an API key');
+        return;
+      }
+
+      const loadBtn = document.getElementById('load-btn');
+      loadBtn.disabled = true;
+      loadBtn.textContent = 'Loading...';
+
+      document.getElementById('content').innerHTML = `
+        <div class="loading-message">
+          <div class="spinner"></div>
+          <p>Loading memories from EverMem Cloud...</p>
+        </div>
+      `;
+
+      try {
+        const response = await fetch(`${PROXY_URL}/api/v1/memories`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            user_id: 'claude-code-user',
+            memory_type: 'episodic_memory',
+            limit: 500,
+            offset: 0
+          })
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.message || `API error: ${response.status} ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        memories = transformApiResponse(data);
+        filteredMemories = [...memories];
+
+        if (memories.length === 0) {
+          document.getElementById('content').innerHTML = `
+            <div class="empty-state">
+              <h3>No Memories Found</h3>
+              <p>Your EverMem account doesn't have any memories yet. Start using Claude Code with the EverMem plugin to build your memory.</p>
+            </div>
+          `;
+          document.getElementById('stats').textContent = '0 memories';
+        } else {
+          // Show controls
+          document.getElementById('refresh-btn').style.display = 'flex';
+          document.getElementById('search-input').style.display = 'block';
+          document.getElementById('project-filter').style.display = 'block';
+          populateProjectFilter();
+          renderDashboard();
+        }
+      } catch (error) {
+        document.getElementById('content').innerHTML = `
+          <div class="error-message">
+            <strong>Error loading memories:</strong> ${error.message}
+          </div>
+          <div class="empty-state">
+            <p>Please check your API key and try again.</p>
+          </div>
+        `;
+      } finally {
+        loadBtn.disabled = false;
+        loadBtn.textContent = 'Load';
+      }
+    }
+
+    async function refreshData() {
+      const refreshBtn = document.getElementById('refresh-btn');
+      refreshBtn.classList.add('spinning');
+      refreshBtn.disabled = true;
+      await loadData();
+      refreshBtn.classList.remove('spinning');
+      refreshBtn.disabled = false;
+    }
+
+    function populateProjectFilter() {
+      const select = document.getElementById('project-filter');
+      const groups = new Set();
+      memories.forEach(m => { if (m.groupId) groups.add(m.groupId); });
+
+      select.innerHTML = '<option value="">All Projects</option>';
+      groups.forEach(g => {
+        const displayName = g.replace(/^claude-code:/, '');
+        const option = document.createElement('option');
+        option.value = g;
+        option.textContent = displayName.length > 40 ? '...' + displayName.slice(-40) : displayName;
+        select.appendChild(option);
+      });
+    }
+
+    function filterMemories() {
+      const searchTerm = document.getElementById('search-input').value.toLowerCase();
+      const projectFilter = document.getElementById('project-filter').value;
+
+      filteredMemories = memories.filter(m => {
+        const matchesSearch = !searchTerm ||
+          m.content.toLowerCase().includes(searchTerm) ||
+          m.subject.toLowerCase().includes(searchTerm);
+        const matchesProject = !projectFilter || m.groupId === projectFilter;
+        return matchesSearch && matchesProject;
+      });
+
+      renderTimeline();
+      updateStats();
+    }
+
+    function updateStats() {
+      const showing = filteredMemories.length;
+      const total = memories.length;
+      const suffix = showing === total ? '' : ` (showing ${showing})`;
+      document.getElementById('stats').textContent =
+        `${total} memories${suffix} | Last updated: ${new Date().toLocaleTimeString()}`;
+    }
+
+    function transformApiResponse(apiResponse) {
+      if (!apiResponse?.result?.memories) return [];
+
+      const memoryList = apiResponse.result.memories || [];
+      const scores = apiResponse.result.scores || [];
+
+      return memoryList.map((mem, i) => {
+        const timestamp = mem.timestamp || mem.create_time || new Date().toISOString();
+        const date = new Date(timestamp);
+
+        return {
+          id: mem.id || mem.message_id || `mem_${i}`,
+          content: mem.episode || mem.content || '',
+          subject: mem.subject || '',
+          groupId: mem.group_id || '',
+          participants: mem.participants || [],
+          timestamp: timestamp,
+          date: formatLocalDate(date),
+          time: date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+          score: scores[i] || 0,
+          memoryType: mem.memory_type
+        };
+      }).filter(m => m.content);
+    }
+
+    function renderDashboard() {
+      const stats = calculateStats();
+      updateStats();
+
+      document.getElementById('content').innerHTML = `
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="label">Total Memories</div>
+            <div class="value">${stats.totalMemories}</div>
+            <div class="trend">${stats.memoriesThisWeek > 0 ? `+${stats.memoriesThisWeek} this week` : 'No new this week'}</div>
+          </div>
+          <div class="stat-card">
+            <div class="label">Projects</div>
+            <div class="value">${stats.uniqueGroups}</div>
+            <div class="trend neutral">Unique workspaces</div>
+          </div>
+          <div class="stat-card">
+            <div class="label">Active Days</div>
+            <div class="value">${stats.activeDays}</div>
+            <div class="trend neutral">Streak: ${stats.currentStreak} ${stats.currentStreak === 1 ? 'day' : 'days'}</div>
+          </div>
+          <div class="stat-card">
+            <div class="label">Avg / Day</div>
+            <div class="value">${stats.avgPerDay}</div>
+            <div class="trend neutral">Memories per active day</div>
+          </div>
+        </div>
+
+        <div class="heatmap-section">
+          <div class="section-title">Memory Activity (Last Year)</div>
+          <div class="heatmap-months" id="heatmap-months"></div>
+          <div class="heatmap-body">
+            <div class="heatmap-days">
+              <span></span>
+              <span>Mon</span>
+              <span></span>
+              <span>Wed</span>
+              <span></span>
+              <span>Fri</span>
+              <span></span>
+            </div>
+            <div class="heatmap-grid" id="heatmap"></div>
+          </div>
+          <div class="heatmap-legend">
+            Less
+            <div class="heatmap-legend-cell" style="background: #161b22; border: 1px solid #21262d;"></div>
+            <div class="heatmap-legend-cell" style="background: #0e4429;"></div>
+            <div class="heatmap-legend-cell" style="background: #006d32;"></div>
+            <div class="heatmap-legend-cell" style="background: #26a641;"></div>
+            <div class="heatmap-legend-cell" style="background: #39d353;"></div>
+            More
+          </div>
+          <div class="heatmap-tooltip" id="heatmap-tooltip"></div>
+        </div>
+
+        <div class="growth-section">
+          <div class="section-title">Memory Growth (Last 14 Days)</div>
+          <div class="growth-chart" id="growth-chart"></div>
+        </div>
+
+        <div class="timeline-section">
+          <div class="section-title" style="margin-bottom: 20px;">Daily Memory Timeline</div>
+          <div class="timeline" id="timeline"></div>
+        </div>
+      `;
+
+      buildHeatmap(stats.memoriesByDate);
+      buildGrowthChart(stats.memoriesByDate);
+      buildTimeline();
+    }
+
+    function calculateStats() {
+      const now = new Date();
+      const oneWeekAgo = new Date(now);
+      oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+
+      const memoriesByDate = {};
+      const uniqueGroups = new Set();
+      let memoriesThisWeek = 0;
+
+      memories.forEach(mem => {
+        memoriesByDate[mem.date] = (memoriesByDate[mem.date] || 0) + 1;
+        if (mem.groupId) uniqueGroups.add(mem.groupId);
+
+        const memDate = new Date(mem.date);
+        if (memDate >= oneWeekAgo) memoriesThisWeek++;
+      });
+
+      let currentStreak = 0;
+      const todayStr = formatLocalDate(now);
+      let checkDate = new Date(now);
+
+      while (true) {
+        const dateStr = formatLocalDate(checkDate);
+        if (memoriesByDate[dateStr]) {
+          currentStreak++;
+          checkDate.setDate(checkDate.getDate() - 1);
+        } else if (dateStr !== todayStr) {
+          break;
+        } else {
+          checkDate.setDate(checkDate.getDate() - 1);
+        }
+      }
+
+      const activeDays = Object.keys(memoriesByDate).length;
+      const avgPerDay = activeDays > 0 ? (memories.length / activeDays).toFixed(1) : 0;
+
+      return {
+        totalMemories: memories.length,
+        uniqueGroups: uniqueGroups.size,
+        activeDays,
+        avgPerDay,
+        memoriesThisWeek,
+        currentStreak,
+        memoriesByDate
+      };
+    }
+
+    function buildHeatmap(memoriesByDate) {
+      const heatmapContainer = document.getElementById('heatmap');
+      const monthsContainer = document.getElementById('heatmap-months');
+      const today = new Date();
+
+      // Find the Sunday ~1 year ago
+      const startDate = new Date(today);
+      startDate.setDate(startDate.getDate() - 364);
+      while (startDate.getDay() !== 0) {
+        startDate.setDate(startDate.getDate() - 1);
+      }
+
+      // Build weeks (columns)
+      const weeks = [];
+      let currentWeek = [];
+      const months = new Map();
+      let currentDate = new Date(startDate);
+
+      while (currentDate <= today) {
+        const dateStr = formatLocalDate(currentDate);
+        const monthKey = currentDate.toLocaleDateString('en-US', { month: 'short' });
+
+        // Track first occurrence of each month
+        if (!months.has(monthKey)) {
+          months.set(monthKey, weeks.length);
+        }
+
+        currentWeek.push({
+          date: dateStr,
+          count: memoriesByDate[dateStr] || 0,
+          dayOfWeek: currentDate.getDay()
+        });
+
+        if (currentDate.getDay() === 6) {
+          weeks.push(currentWeek);
+          currentWeek = [];
+        }
+
+        currentDate.setDate(currentDate.getDate() + 1);
+      }
+
+      if (currentWeek.length > 0) {
+        weeks.push(currentWeek);
+      }
+
+      // Render month labels
+      monthsContainer.innerHTML = '';
+      const weekWidth = 16; // 13px cell + 3px gap
+
+      months.forEach((weekIndex, monthName) => {
+        const span = document.createElement('span');
+        span.textContent = monthName;
+        span.style.left = `${weekIndex * weekWidth}px`;
+        monthsContainer.appendChild(span);
+      });
+
+      // Render weeks (columns)
+      heatmapContainer.innerHTML = '';
+      weeks.forEach((week, weekIndex) => {
+        const weekDiv = document.createElement('div');
+        weekDiv.className = 'heatmap-week';
+
+        // Pad first week if it doesn't start on Sunday
+        if (weekIndex === 0 && week[0].dayOfWeek !== 0) {
+          for (let i = 0; i < week[0].dayOfWeek; i++) {
+            const emptyCell = document.createElement('div');
+            emptyCell.className = 'heatmap-cell';
+            emptyCell.style.visibility = 'hidden';
+            weekDiv.appendChild(emptyCell);
+          }
+        }
+
+        week.forEach(day => {
+          const cell = document.createElement('div');
+          cell.className = 'heatmap-cell';
+          cell.dataset.date = day.date;
+          cell.dataset.count = day.count;
+
+          if (day.count >= 4) cell.classList.add('level-4');
+          else if (day.count >= 3) cell.classList.add('level-3');
+          else if (day.count >= 2) cell.classList.add('level-2');
+          else if (day.count >= 1) cell.classList.add('level-1');
+
+          cell.addEventListener('mouseenter', showHeatmapTooltip);
+          cell.addEventListener('mouseleave', hideHeatmapTooltip);
+          weekDiv.appendChild(cell);
+        });
+
+        // Pad last week if it doesn't end on Saturday
+        if (weekIndex === weeks.length - 1 && week[week.length - 1].dayOfWeek !== 6) {
+          for (let i = week[week.length - 1].dayOfWeek + 1; i <= 6; i++) {
+            const emptyCell = document.createElement('div');
+            emptyCell.className = 'heatmap-cell';
+            emptyCell.style.visibility = 'hidden';
+            weekDiv.appendChild(emptyCell);
+          }
+        }
+
+        heatmapContainer.appendChild(weekDiv);
+      });
+    }
+
+    function showHeatmapTooltip(e) {
+      const tooltip = document.getElementById('heatmap-tooltip');
+      const cell = e.target;
+      const date = cell.dataset.date;
+      const count = parseInt(cell.dataset.count);
+
+      // Format date nicely
+      const dateObj = new Date(date + 'T12:00:00');
+      const formattedDate = dateObj.toLocaleDateString('en-US', {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
+      });
+
+      const memoryText = count === 1 ? 'memory' : 'memories';
+      tooltip.innerHTML = `<strong>${count} ${memoryText}</strong> on ${formattedDate}`;
+      tooltip.style.display = 'block';
+
+      // Position tooltip near cursor
+      const rect = cell.getBoundingClientRect();
+      tooltip.style.left = `${rect.left + rect.width / 2}px`;
+      tooltip.style.top = `${rect.top - 40}px`;
+      tooltip.style.transform = 'translateX(-50%)';
+    }
+
+    function hideHeatmapTooltip() {
+      const tooltip = document.getElementById('heatmap-tooltip');
+      tooltip.style.display = 'none';
+    }
+
+    function buildGrowthChart(memoriesByDate) {
+      const chartContainer = document.getElementById('growth-chart');
+      const today = new Date();
+
+      const dailyData = [];
+      for (let i = 13; i >= 0; i--) {
+        const date = new Date(today);
+        date.setDate(date.getDate() - i);
+        const dateStr = formatLocalDate(date);
+        const displayDate = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        dailyData.push({
+          date: displayDate,
+          count: memoriesByDate[dateStr] || 0
+        });
+      }
+
+      const maxCount = Math.max(...dailyData.map(d => d.count), 1);
+
+      dailyData.forEach(day => {
+        const barContainer = document.createElement('div');
+        barContainer.className = 'chart-bar-container';
+
+        const barWrapper = document.createElement('div');
+        barWrapper.className = 'chart-bar-wrapper';
+
+        const bar = document.createElement('div');
+        bar.className = 'chart-bar';
+        bar.style.height = day.count > 0 ? `${(day.count / maxCount) * 100}%` : '4px';
+        bar.style.opacity = day.count > 0 ? '1' : '0.2';
+
+        const barTooltip = document.createElement('div');
+        barTooltip.className = 'bar-tooltip';
+        barTooltip.textContent = `${day.count} memories`;
+        bar.appendChild(barTooltip);
+
+        const label = document.createElement('div');
+        label.className = 'chart-label';
+        label.textContent = day.date.split(' ')[1];
+
+        barWrapper.appendChild(bar);
+        barContainer.appendChild(barWrapper);
+        barContainer.appendChild(label);
+        chartContainer.appendChild(barContainer);
+      });
+    }
+
+    function buildTimeline() {
+      renderTimeline();
+    }
+
+    function renderTimeline() {
+      const timelineContainer = document.getElementById('timeline');
+      if (!timelineContainer) return;
+
+      const byDate = {};
+      filteredMemories.forEach(mem => {
+        if (!byDate[mem.date]) byDate[mem.date] = [];
+        byDate[mem.date].push(mem);
+      });
+
+      const dates = Object.keys(byDate).sort().reverse();
+      const todayStr = formatLocalDate(new Date());
+
+      if (dates.length === 0) {
+        timelineContainer.innerHTML = '<div class="no-results">No memories match your search.</div>';
+        return;
+      }
+
+      timelineContainer.innerHTML = '';
+
+      dates.forEach(date => {
+        const dayMemories = byDate[date].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+        const dayDiv = document.createElement('div');
+        dayDiv.className = 'timeline-day';
+        dayDiv.dataset.date = date;
+
+        const dot = document.createElement('div');
+        dot.className = 'timeline-dot' + (date === todayStr ? ' today' : '');
+        dayDiv.appendChild(dot);
+
+        const header = document.createElement('div');
+        header.className = 'day-header';
+
+        const dateDisplay = new Date(date + 'T12:00:00').toLocaleDateString('en-US', {
+          weekday: 'long', month: 'short', day: 'numeric'
+        });
+
+        header.innerHTML = `
+          <span class="day-date">${dateDisplay}</span>
+          ${date === todayStr ? '<span class="day-badge">Today</span>' : ''}
+          <span class="day-stats">${dayMemories.length} ${dayMemories.length === 1 ? 'memory' : 'memories'}</span>
+        `;
+        dayDiv.appendChild(header);
+
+        const cardsDiv = document.createElement('div');
+        cardsDiv.className = 'memory-cards';
+
+        dayMemories.forEach(memory => {
+          const card = document.createElement('div');
+          card.className = 'memory-card';
+          card.onclick = () => openModal(memory);
+
+          const displaySubject = memory.subject || (memory.content.length > 40 ? memory.content.slice(0, 40) + '...' : memory.content);
+          const displayContent = memory.content.length > 150 ? memory.content.slice(0, 150) + '...' : memory.content;
+          const projectName = memory.groupId ? memory.groupId.replace(/^claude-code:/, '') : '';
+
+          card.innerHTML = `
+            <div class="memory-card-header">
+              <div class="memory-type-dot" style="background: #58a6ff"></div>
+              <span class="memory-label">${escapeHtml(displaySubject)}</span>
+              <span class="memory-time">${memory.time}</span>
+            </div>
+            ${projectName ? `<div class="memory-project">${escapeHtml(projectName)}</div>` : ''}
+            <div class="memory-content">${escapeHtml(displayContent)}</div>
+          `;
+          cardsDiv.appendChild(card);
+        });
+
+        dayDiv.appendChild(cardsDiv);
+        timelineContainer.appendChild(dayDiv);
+      });
+    }
+
+    function openModal(memory) {
+      const projectName = memory.groupId ? memory.groupId.replace(/^claude-code:/, '') : '';
+      const dateStr = new Date(memory.timestamp).toLocaleDateString('en-US', {
+        weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
+      });
+
+      document.getElementById('modal-title').textContent = memory.subject || 'Memory';
+      document.getElementById('modal-meta').innerHTML = `${dateStr}${projectName ? ` · <span style="font-family: monospace;">${escapeHtml(projectName)}</span>` : ''}`;
+      document.getElementById('modal-content').textContent = memory.content;
+      document.getElementById('modal-overlay').classList.add('visible');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closeModal(event) {
+      if (event && event.target !== event.currentTarget) return;
+      document.getElementById('modal-overlay').classList.remove('visible');
+      document.body.style.overflow = '';
+    }
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeModal();
+    });
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    // Format date as YYYY-MM-DD using local timezone
+    function formatLocalDate(date) {
+      return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    }
+  </script>
+</body>
+</html>

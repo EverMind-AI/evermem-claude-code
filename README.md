@@ -1,93 +1,120 @@
 # EverMem Plugin for Claude Code
 
-> 🧠 Automatic memory recall for Claude Code - remembers context from past sessions
+Persistent memory for Claude Code. Automatically saves and recalls context from past coding sessions.
 
-EverMem gives Claude Code persistent memory. When you ask a question, relevant memories from past conversations are automatically injected into context, so Claude remembers your preferences, decisions, and project history.
+## Features
 
-## Quick Install
+- **Automatic Memory Recall** - Relevant memories are retrieved when you submit a prompt
+- **Automatic Memory Save** - Conversations are saved when Claude finishes responding
+- **Memory Search** - Manually search your memory history
+- **Memory Hub** - Visual dashboard to explore and manage memories
 
-```bash
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/EverMind-AI/evermem-claude-code/main/install.sh)"
-```
+## Installation
 
-This will:
-1. Prompt for your EverMem API key
-2. Save it to your shell profile
-3. Install the plugin via Claude Code's plugin system
+### 1. Get Your API Key
 
-**Get your API key:** [evermind.ai/dashboard/api-keys](https://evermind.ai/dashboard/api-keys)
+Visit [console.evermind.ai](https://console.evermind.ai/) to create an account and get your API key.
 
-## Manual Installation
+### 2. Configure Environment Variable
 
-### Step 1: Get API Key
-
-1. Sign up at [evermind.ai](https://evermind.ai)
-2. Go to Dashboard → API Keys
-3. Create a new API key
-
-### Step 2: Configure API Key
-
-Add to your shell profile (`~/.zshrc`, `~/.bashrc`, etc.):
+Add to your shell profile (`~/.zshrc` or `~/.bashrc`):
 
 ```bash
 export EVERMEM_API_KEY="your-api-key-here"
 ```
 
-Then reload: `source ~/.zshrc`
+Reload your shell:
 
-### Step 3: Install Plugin
+```bash
+source ~/.zshrc  # or source ~/.bashrc
+```
+
+### 3. Install the Plugin
 
 In Claude Code, run:
 
 ```
-/plugin marketplace add EverMind-AI/evermem-claude-code
-/plugin install evermem@evermem
+/install-plugin https://github.com/anthropics/evermem-plugin
 ```
+
+Or install from a local directory:
+
+```
+/install-plugin /path/to/memory-plugin
+```
+
+### 4. Verify Installation
+
+Run `/evermem:help` to check if the plugin is configured correctly.
+
+## Usage
+
+### Commands
+
+| Command | Description |
+|---------|-------------|
+| `/evermem:help` | Show setup status and available commands |
+| `/evermem:search <query>` | Search your memories for specific topics |
+| `/evermem:hub` | Open the Memory Hub dashboard |
+
+### Automatic Behavior
+
+The plugin works automatically in the background:
+
+**On Prompt Submit:**
+```
+You: "How should I handle authentication?"
+         ↓
+📝 Memory Recall by EverMem Plugin (2 memories):
+  • [0.85] (2 days ago) Discussion about JWT token implementation
+  • [0.72] (1 week ago) Auth middleware setup decisions
+         ↓
+Claude receives the relevant context and responds accordingly
+```
+
+**On Response Complete:**
+```
+💾 EverMem: Memory saved (4 messages)
+```
+
+### Memory Hub
+
+The Memory Hub provides a visual interface to explore your memories:
+
+- Activity heatmap (GitHub-style)
+- Memory statistics
+- Search and filter capabilities
+- Timeline view
+
+To use the hub, run `/evermem:hub` and follow the instructions.
 
 ## How It Works
 
 ```
-You: "How should I handle token refresh?"
-                    ↓
-        [EverMem searches your memories]
-                    ↓
-📝 Memory Recall by EverMem Plugin (2 memories):
-  • (2 days ago) We decided to use JWT with 15-minute expiry...
-  • (1 week ago) Fixed the token refresh race condition...
-                    ↓
-        [Context injected into Claude]
-                    ↓
-Claude: "Based on your JWT setup with 15-minute expiry..."
-```
-
-### What Gets Remembered
-
-- **Decisions** you've made ("We're using PostgreSQL", "JWT for auth")
-- **Bug fixes** and solutions
-- **Project preferences** and conventions
-- **Technical context** from past sessions
-
-### Privacy
-
-- Memories are stored securely in EverMem Cloud
-- Only you can access your memories
-- Delete anytime from the dashboard
-
-## Example Output
-
-When memories are found, you'll see:
-
-```
-📝 Memory Recall by EverMem Plugin (2 memories):
-  • (5h ago) We decided to use JWT tokens with 15-minute expiry for authenticati...
-  • (1 day ago) Fixed the token refresh race condition bug. When multiple API calls...
-
-Added to context:
-<relevant-memories>
-The following memories from past sessions are relevant to the user's current task:
-
-[decision] We decided to use JWT tokens with 15-minute expiry for authentication...
-</relevant-memories>
+┌─────────────────────────────────────────────────────────────┐
+│                     Your Prompt                             │
+└─────────────────────────────────────────────────────────────┘
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────────┐
+│  UserPromptSubmit Hook                                      │
+│  • Searches EverMem Cloud for relevant memories             │
+│  • Displays memory summary to user                          │
+│  • Injects context into Claude's prompt                     │
+└─────────────────────────────────────────────────────────────┘
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────────┐
+│                   Claude Response                           │
+└─────────────────────────────────────────────────────────────┘
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────────┐
+│  Stop Hook                                                  │
+│  • Extracts conversation from transcript                    │
+│  • Sends to EverMem Cloud for storage                       │
+│  • Server generates summary and stores memory               │
+└─────────────────────────────────────────────────────────────┘
 ```
 
 ## Configuration
@@ -98,47 +125,82 @@ The following memories from past sessions are relevant to the user's current tas
 |----------|-------------|----------|
 | `EVERMEM_API_KEY` | Your EverMem API key | Yes |
 
-### Plugin Settings (Optional)
+### Project-Specific Settings
 
-Create `.claude/evermem.local.md` in your project for per-project config:
+Create `.claude/evermem.local.md` in your project root for per-project configuration:
 
 ```markdown
 ---
 group_id: "my-project"
 ---
+
+Project-specific notes here.
 ```
 
 ## Troubleshooting
 
-### Plugin not loading
+### API Key Not Configured
 
 ```bash
-# Verify plugin is installed
-/plugin list
+# Check if the key is set
+echo $EVERMEM_API_KEY
 
-# Re-install if needed
-/plugin install evermem@evermem --scope user
+# If empty, add to your shell profile and reload
+export EVERMEM_API_KEY="your-key-here"
+source ~/.zshrc
 ```
 
-### No memories appearing
+### No Memories Found
 
-1. Check API key is set: `echo $EVERMEM_API_KEY`
-2. Ensure you have memories stored (use EverMem with other integrations first)
-3. Check Claude Code verbose mode for errors
+1. Memories are only recalled after you've had previous conversations
+2. Short prompts (less than 3 words) are skipped
+3. Check that your API key is valid at [console.evermind.ai](https://console.evermind.ai/)
 
-### API errors
+### API Errors
 
-- Verify your API key at [evermind.ai/dashboard](https://evermind.ai/dashboard)
-- Check your usage quota
+- **403 Forbidden**: Invalid or expired API key
+- **502 Bad Gateway**: Server temporarily unavailable, try again
+
+## Project Structure
+
+```
+evermem-plugin/
+├── .claude-plugin/
+│   └── plugin.json           # Plugin manifest
+├── commands/
+│   ├── help.md               # /evermem:help command
+│   ├── search.md             # /evermem:search command
+│   └── hub.md                # /evermem:hub command
+├── hooks/
+│   ├── hooks.json            # Hook configuration
+│   └── scripts/
+│       ├── inject-memories.js    # Memory recall (UserPromptSubmit)
+│       ├── store-memories.js     # Memory save (Stop)
+│       └── utils/
+│           ├── evermem-api.js    # EverMem Cloud API client
+│           └── config.js         # Configuration utilities
+├── assets/
+│   └── dashboard.html        # Memory Hub dashboard
+├── server/
+│   └── proxy.js              # Local proxy server for dashboard
+└── README.md
+```
+
+## API Reference
+
+The plugin uses the EverMem Cloud API at `https://api.evermind.ai`:
+
+- `POST /api/v1/memories` - Store a new memory
+- `POST /api/v1/memories/search` - Search memories (hybrid retrieval)
 
 ## Development
 
 ### Local Development
 
 ```bash
-# Clone the repo
-git clone https://github.com/EverMind-AI/evermem-claude-code.git
-cd evermem-claude-code
+# Clone the repository
+git clone https://github.com/anthropics/evermem-plugin.git
+cd evermem-plugin
 
 # Install dependencies
 npm install
@@ -147,39 +209,21 @@ npm install
 claude --plugin-dir .
 ```
 
-### Testing
+### Testing Hooks
 
 ```bash
-# Test the hook script directly
-echo '{"prompt":"How do I handle auth?"}' | node hooks/scripts/inject-memories.js
-```
+# Test memory recall
+echo '{"prompt":"How do I handle authentication?"}' | node hooks/scripts/inject-memories.js
 
-## File Structure
-
-```
-evermem-claude-code/
-├── .claude-plugin/
-│   └── plugin.json              # Plugin manifest
-├── hooks/
-│   ├── hooks.json               # Hook configuration
-│   └── scripts/
-│       ├── inject-memories.js   # Memory recall hook
-│       └── utils/
-│           ├── evermem-api.js   # EverMem Cloud API client
-│           ├── config.js        # Configuration loader
-│           └── sdk-filter.js    # Claude SDK filtering
-├── marketplace.json             # Marketplace definition
-├── install.sh                   # One-line installer
-├── package.json
-└── README.md
+# Test memory save (requires transcript file)
+echo '{"transcript_path":"/path/to/transcript.json"}' | node hooks/scripts/store-memories.js
 ```
 
 ## Links
 
-- **Website:** [evermind.ai](https://evermind.ai)
-- **Documentation:** [docs.evermind.ai](https://docs.evermind.ai)
-- **Dashboard:** [evermind.ai/dashboard](https://evermind.ai/dashboard)
-- **Issues:** [GitHub Issues](https://github.com/EverMind-AI/evermem-claude-code/issues)
+- **Console**: [console.evermind.ai](https://console.evermind.ai/)
+- **API Documentation**: [docs.evermind.ai](https://docs.evermind.ai)
+- **Issues**: [GitHub Issues](https://github.com/anthropics/evermem-plugin/issues)
 
 ## License
 

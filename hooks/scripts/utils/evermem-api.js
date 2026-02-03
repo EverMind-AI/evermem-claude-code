@@ -7,6 +7,7 @@ import { getConfig } from './config.js';
 import { appendFileSync } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
+import { execSync } from 'child_process';
 
 const TIMEOUT_MS = 30000; // 30 seconds
 const DEBUG = process.env.EVERMEM_DEBUG === '1';
@@ -47,37 +48,52 @@ export async function searchMemories(query, options = {}) {
   const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
   try {
-    // Build query params for GET request
-    const params = new URLSearchParams({
+    // Build request body (API uses GET with body - need curl since fetch doesn't support it)
+    const requestBody = {
       query,
-      user_id: config.userId,
       retrieve_method: retrieveMethod,
-      top_k: String(topK),
-      include_metadata: 'true'
-    });
+      top_k: topK,
+      include_metadata: true,
+      memory_types: memoryTypes
+    };
+    // Scope to user and group
+    if (config.userId) {
+      requestBody.user_id = config.userId;
+    }
     if (config.groupId) {
-      params.append('group_id', config.groupId);
+      requestBody.group_id = config.groupId;
     }
-    for (const memType of memoryTypes) {
-      params.append('memory_types', memType);
-    }
-
-    const response = await fetch(`${config.apiBaseUrl}/api/v1/memories/search?${params.toString()}`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${config.apiKey}`
-      },
-      signal: controller.signal
-    });
 
     clearTimeout(timeoutId);
 
-    if (!response.ok) {
-      const errorBody = await response.text().catch(() => '');
-      throw new Error(`API error ${response.status}: ${errorBody}`);
+    // Use curl since Node.js fetch doesn't support GET with body
+    // Escape single quotes in JSON for shell safety: ' -> '\''
+    const jsonBody = JSON.stringify(requestBody).replace(/'/g, "'\\''");
+    const curlCmd = `curl -s -X GET "${config.apiBaseUrl}/api/v1/memories/search" -H "Authorization: Bearer ${config.apiKey}" -H "Content-Type: application/json" -d '${jsonBody}'`;
+
+    // Return debug info along with result
+    let result, data;
+    try {
+      result = execSync(curlCmd, { timeout: TIMEOUT_MS, encoding: 'utf8' });
+      data = JSON.parse(result);
+    } catch (e) {
+      // Return error info for debugging
+      return {
+        _debug: {
+          curl: curlCmd.replace(config.apiKey, 'API_KEY_HIDDEN'),
+          requestBody,
+          error: e.message,
+          stdout: e.stdout?.toString(),
+          stderr: e.stderr?.toString()
+        }
+      };
     }
 
-    const data = await response.json();
+    // Attach debug info to response
+    data._debug = {
+      curl: curlCmd.replace(config.apiKey, 'API_KEY_HIDDEN'),
+      requestBody
+    };
     return data;
   } catch (error) {
     clearTimeout(timeoutId);
@@ -101,55 +117,30 @@ export function transformSearchResults(apiResponse) {
 
   const memories = [];
   const result = apiResponse.result;
-  const memoryGroups = result.memories || [];
-  const originalData = result.original_data || [];
-  const scoreGroups = result.scores || [];
+  const memoryList = result.memories || [];
+  const scores = result.scores || [];
 
-  // Iterate through memory groups and match with original_data for content
-  for (let i = 0; i < memoryGroups.length; i++) {
-    const memoryGroup = memoryGroups[i];
-    const dataGroup = originalData[i] || {};
-    const scoresForGroup = scoreGroups[i] || {};
+  // API returns: memories[].episode for content, memories[].subject for title
+  for (let i = 0; i < memoryList.length; i++) {
+    const mem = memoryList[i];
+    const score = scores[i] || 0;
 
-    // Each group is keyed by group_id
-    for (const [groupId, memoryItems] of Object.entries(memoryGroup)) {
-      if (!Array.isArray(memoryItems)) continue;
+    // Use episode as the content
+    const content = mem.episode || '';
+    if (!content) continue;
 
-      const dataItems = dataGroup[groupId] || [];
-      const scores = scoresForGroup[groupId] || [];
-
-      for (let j = 0; j < memoryItems.length; j++) {
-        const memoryMeta = memoryItems[j];
-        const dataItem = dataItems[j];
-        const score = scores[j] || 0;
-
-        // Extract content from original_data
-        let content = '';
-        if (dataItem?.messages && Array.isArray(dataItem.messages)) {
-          // Combine all messages in the conversation
-          content = dataItem.messages
-            .map(msg => msg.content)
-            .filter(Boolean)
-            .join('\n\n');
-        } else if (dataItem?.content) {
-          content = dataItem.content;
-        }
-
-        if (!content) continue;
-
-        memories.push({
-          text: content,
-          timestamp: memoryMeta.timestamp || new Date().toISOString(),
-          type: mapMemoryType(memoryMeta.memory_type),
-          score: score,
-          metadata: {
-            groupId: memoryMeta.group_id,
-            type: memoryMeta.type,
-            participants: memoryMeta.participants
-          }
-        });
+    memories.push({
+      text: content,
+      subject: mem.subject || '',  // Title for display
+      timestamp: mem.timestamp || new Date().toISOString(),
+      memoryType: mem.memory_type,  // Keep raw type if needed
+      score: score,
+      metadata: {
+        groupId: mem.group_id,
+        type: mem.type,
+        participants: mem.participants
       }
-    }
+    });
   }
 
   // Sort by score descending
@@ -158,20 +149,6 @@ export function transformSearchResults(apiResponse) {
   return memories;
 }
 
-/**
- * Map API memory types to display types
- * @param {string} apiType - API memory type
- * @returns {string} Display type
- */
-function mapMemoryType(apiType) {
-  const typeMap = {
-    'episodic_memory': 'implementation',
-    'profile': 'preference',
-    'foresight': 'decision',
-    'event_log': 'learning'
-  };
-  return typeMap[apiType] || 'implementation';
-}
 
 /**
  * Add a memory to EverMem Cloud
@@ -184,31 +161,15 @@ function mapMemoryType(apiType) {
 export async function addMemory(message) {
   const config = getConfig();
 
-  debugLog('addMemory called', {
-    role: message.role,
-    contentLength: message.content?.length,
-    messageId: message.messageId
-  });
-
   if (!config.isConfigured) {
-    debugLog('addMemory: Not configured');
     throw new Error('EverMem API key not configured');
   }
 
-  debugLog('addMemory config', {
-    apiBaseUrl: config.apiBaseUrl,
-    userId: config.userId,
-    groupId: config.groupId,
-    hasApiKey: !!config.apiKey
-  });
-
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
-
+  const url = `${config.apiBaseUrl}/api/v1/memories`;
   const requestBody = {
     message_id: message.messageId || generateMessageId(),
     create_time: new Date().toISOString(),
-    sender: config.userId,
+    sender: message.role === 'assistant' ? 'claude-assistant' : config.userId,
     sender_name: message.role === 'assistant' ? 'Claude' : 'User',
     role: message.role || 'user',
     content: message.content,
@@ -216,50 +177,38 @@ export async function addMemory(message) {
     group_name: 'Claude Code Session'
   };
 
-  debugLog('addMemory request body', {
-    message_id: requestBody.message_id,
-    sender: requestBody.sender,
-    role: requestBody.role,
-    group_id: requestBody.group_id,
-    contentPreview: requestBody.content?.substring(0, 100)
-  });
+  // Make the actual API call
+  let response, responseText, responseData, status, ok;
 
   try {
-    const url = `${config.apiBaseUrl}/api/v1/memories`;
-    debugLog('addMemory POST', url);
-
-    const response = await fetch(url, {
+    response = await fetch(url, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${config.apiKey}`,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify(requestBody),
-      signal: controller.signal
+      body: JSON.stringify(requestBody)
     });
-
-    clearTimeout(timeoutId);
-
-    debugLog('addMemory response status', response.status);
-
-    if (!response.ok) {
-      const errorBody = await response.text().catch(() => '');
-      debugLog('addMemory error response', errorBody);
-      throw new Error(`API error ${response.status}: ${errorBody}`);
-    }
-
-    const result = await response.json();
-    debugLog('addMemory success', result);
-    return result;
-  } catch (error) {
-    clearTimeout(timeoutId);
-    debugLog('addMemory exception', error.message);
-
-    if (error.name === 'AbortError') {
-      throw new Error(`API timeout after ${TIMEOUT_MS}ms`);
-    }
-    throw error;
+    status = response.status;
+    ok = response.ok;
+    responseText = await response.text();
+    try {
+      responseData = JSON.parse(responseText);
+    } catch {}
+  } catch (fetchError) {
+    status = 0;
+    ok = false;
+    responseText = fetchError.message;
   }
+
+  // Always return full info for debugging
+  return {
+    url,
+    body: requestBody,
+    status,
+    ok,
+    response: responseData || responseText
+  };
 }
 
 /**
