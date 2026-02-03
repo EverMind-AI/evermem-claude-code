@@ -1,0 +1,804 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EverMem - Memory Hub</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0d1117;
+      color: #c9d1d9;
+      min-height: 100vh;
+    }
+    #header {
+      padding: 16px 24px;
+      border-bottom: 1px solid #30363d;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      background: rgba(13, 17, 23, 0.95);
+      backdrop-filter: blur(10px);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      flex-wrap: wrap;
+    }
+    #header h1 { font-size: 18px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+    #header .stats {
+      font-size: 13px;
+      color: #8b949e;
+      margin-left: auto;
+    }
+    .header-controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .search-input, .filter-select {
+      padding: 6px 12px;
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      color: #c9d1d9;
+      font-size: 13px;
+    }
+    .search-input { width: 200px; }
+    .filter-select { min-width: 120px; cursor: pointer; }
+    .search-input:focus, .filter-select:focus {
+      outline: none;
+      border-color: #58a6ff;
+    }
+    .refresh-btn {
+      padding: 6px 12px;
+      background: #30363d;
+      border: none;
+      border-radius: 6px;
+      color: #fff;
+      font-size: 13px;
+      cursor: pointer;
+      transition: background 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .refresh-btn:hover { background: #3d444d; }
+
+    #progress-view {
+      width: 100%;
+      padding: 24px;
+      overflow-y: auto;
+    }
+    .progress-container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin-bottom: 32px;
+    }
+    @media (max-width: 768px) {
+      .stats-grid { grid-template-columns: repeat(2, 1fr); }
+      #header { flex-direction: column; align-items: flex-start; }
+      .header-controls { flex-wrap: wrap; }
+    }
+    .stat-card {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      padding: 20px;
+    }
+    .stat-card .label {
+      font-size: 12px;
+      color: #8b949e;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+    }
+    .stat-card .value {
+      font-size: 32px;
+      font-weight: 600;
+      color: #f0f6fc;
+    }
+    .stat-card .trend {
+      font-size: 12px;
+      color: #3fb950;
+      margin-top: 4px;
+    }
+    .stat-card .trend.neutral { color: #8b949e; }
+
+    /* Heatmap - GitHub style */
+    .heatmap-section {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 32px;
+      overflow-x: auto;
+    }
+    .section-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #f0f6fc;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .heatmap-months {
+      position: relative;
+      font-size: 11px;
+      color: #8b949e;
+      margin-bottom: 8px;
+      margin-left: 36px;
+      height: 16px;
+    }
+    .heatmap-months span {
+      position: absolute;
+    }
+    .heatmap-body {
+      display: flex;
+      gap: 4px;
+    }
+    .heatmap-days {
+      display: flex;
+      flex-direction: column;
+      font-size: 11px;
+      color: #8b949e;
+      width: 32px;
+      padding-top: 2px;
+    }
+    .heatmap-days span {
+      height: 13px;
+      line-height: 13px;
+    }
+    .heatmap-grid {
+      display: flex;
+      gap: 3px;
+    }
+    .heatmap-week {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+    .heatmap-cell {
+      width: 13px;
+      height: 13px;
+      border-radius: 2px;
+      background: #161b22;
+      border: 1px solid #21262d;
+      cursor: pointer;
+      transition: transform 0.1s;
+      position: relative;
+    }
+    .heatmap-cell:hover { transform: scale(1.3); z-index: 10; }
+    .heatmap-cell.level-1 { background: #0e4429; border-color: #0e4429; }
+    .heatmap-cell.level-2 { background: #006d32; border-color: #006d32; }
+    .heatmap-cell.level-3 { background: #26a641; border-color: #26a641; }
+    .heatmap-cell.level-4 { background: #39d353; border-color: #39d353; }
+    .heatmap-tooltip {
+      position: fixed;
+      background: #1c2128;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      padding: 8px 12px;
+      font-size: 12px;
+      color: #c9d1d9;
+      pointer-events: none;
+      z-index: 1000;
+      white-space: nowrap;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+      display: none;
+    }
+    .heatmap-tooltip strong {
+      color: #f0f6fc;
+    }
+    .heatmap-legend {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 4px;
+      margin-top: 12px;
+      font-size: 11px;
+      color: #8b949e;
+    }
+    .heatmap-legend-cell { width: 12px; height: 12px; border-radius: 2px; }
+
+    .growth-section {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 32px;
+    }
+    .growth-chart {
+      display: flex;
+      align-items: flex-end;
+      gap: 8px;
+      height: 150px;
+      padding: 0 8px;
+    }
+    .chart-bar-container {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      height: 100%;
+    }
+    .chart-bar-wrapper {
+      flex: 1;
+      width: 100%;
+      display: flex;
+      align-items: flex-end;
+    }
+    .chart-bar {
+      width: 100%;
+      background: linear-gradient(to top, #238636, #3fb950);
+      border-radius: 4px 4px 0 0;
+      min-height: 4px;
+      transition: height 0.3s ease;
+      position: relative;
+    }
+    .chart-bar:hover { filter: brightness(1.2); }
+    .chart-bar .bar-tooltip {
+      position: absolute;
+      bottom: calc(100% + 8px);
+      left: 50%;
+      transform: translateX(-50%);
+      background: #0d1117;
+      border: 1px solid #30363d;
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-size: 11px;
+      white-space: nowrap;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s;
+      z-index: 10;
+    }
+    .chart-bar:hover .bar-tooltip { opacity: 1; }
+    .chart-label { font-size: 10px; color: #8b949e; margin-top: 8px; }
+
+    .timeline-section { margin-bottom: 32px; }
+    .timeline { position: relative; padding-left: 32px; }
+    .timeline::before {
+      content: '';
+      position: absolute;
+      left: 7px;
+      top: 0;
+      bottom: 0;
+      width: 2px;
+      background: #30363d;
+    }
+    .timeline-day { position: relative; margin-bottom: 24px; }
+    .timeline-day:last-child { margin-bottom: 0; }
+    .timeline-dot {
+      position: absolute;
+      left: -32px;
+      top: 4px;
+      width: 16px;
+      height: 16px;
+      background: #238636;
+      border: 3px solid #0d1117;
+      border-radius: 50%;
+      z-index: 1;
+    }
+    .timeline-dot.today {
+      background: #58a6ff;
+      box-shadow: 0 0 12px rgba(88, 166, 255, 0.4);
+    }
+    .day-header { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+    .day-date { font-size: 14px; font-weight: 600; color: #f0f6fc; }
+    .day-badge {
+      font-size: 11px;
+      padding: 2px 8px;
+      background: #388bfd22;
+      color: #58a6ff;
+      border-radius: 10px;
+    }
+    .day-stats { font-size: 12px; color: #8b949e; }
+    .memory-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 12px;
+    }
+    .memory-card {
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 14px;
+      transition: border-color 0.2s, transform 0.2s;
+      cursor: pointer;
+    }
+    .memory-card:hover { border-color: #58a6ff; transform: translateY(-2px); }
+    .memory-card-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+    .memory-type-dot { width: 8px; height: 8px; border-radius: 50%; }
+    .memory-label { font-size: 13px; font-weight: 500; color: #f0f6fc; flex: 1; }
+    .memory-time { font-size: 11px; color: #8b949e; }
+    .memory-project { font-size: 11px; color: #8b949e; margin-bottom: 6px; font-family: monospace; }
+    .memory-content {
+      font-size: 12px;
+      color: #8b949e;
+      line-height: 1.5;
+      max-height: 100px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* Modal */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.2s, visibility 0.2s;
+    }
+    .modal-overlay.visible {
+      opacity: 1;
+      visibility: visible;
+    }
+    .modal {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      max-width: 700px;
+      width: 90%;
+      max-height: 80vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      transform: scale(0.95);
+      transition: transform 0.2s;
+    }
+    .modal-overlay.visible .modal {
+      transform: scale(1);
+    }
+    .modal-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid #30363d;
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+    }
+    .modal-header-content { flex: 1; }
+    .modal-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: #f0f6fc;
+      margin-bottom: 4px;
+    }
+    .modal-meta {
+      font-size: 12px;
+      color: #8b949e;
+    }
+    .modal-close {
+      background: none;
+      border: none;
+      color: #8b949e;
+      cursor: pointer;
+      padding: 4px;
+      border-radius: 4px;
+      transition: color 0.2s, background 0.2s;
+    }
+    .modal-close:hover {
+      color: #f0f6fc;
+      background: #30363d;
+    }
+    .modal-body {
+      padding: 20px;
+      overflow-y: auto;
+      flex: 1;
+    }
+    .modal-content {
+      font-size: 14px;
+      color: #c9d1d9;
+      line-height: 1.7;
+      white-space: pre-wrap;
+    }
+  </style>
+</head>
+<body>
+  <div id="header">
+    <h1>
+      <img src="logo.png" alt="EverMem" style="width: 24px; height: 24px; border-radius: 4px;" />
+      EverMem Memory Hub
+    </h1>
+    <div class="header-controls">
+      <button class="refresh-btn" title="Refresh">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M23 4v6h-6M1 20v-6h6"/>
+          <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
+        </svg>
+      </button>
+      <input type="text" class="search-input" placeholder="Search memories..." />
+      <select class="filter-select">
+        <option value="">All Projects</option>
+        <option>evermem-plugin</option>
+        <option>web-dashboard</option>
+        <option>api-server</option>
+      </select>
+    </div>
+    <span class="stats">147 memories | Last updated: 2:34 PM</span>
+  </div>
+
+  <div id="progress-view">
+    <div class="progress-container">
+      <div id="content">
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="label">Total Memories</div>
+            <div class="value">147</div>
+            <div class="trend">+23 this week</div>
+          </div>
+          <div class="stat-card">
+            <div class="label">Projects</div>
+            <div class="value">8</div>
+            <div class="trend neutral">Unique workspaces</div>
+          </div>
+          <div class="stat-card">
+            <div class="label">Active Days</div>
+            <div class="value">34</div>
+            <div class="trend neutral">Streak: 7 days</div>
+          </div>
+          <div class="stat-card">
+            <div class="label">Avg / Day</div>
+            <div class="value">4.3</div>
+            <div class="trend neutral">Memories per active day</div>
+          </div>
+        </div>
+
+        <div class="heatmap-section">
+          <div class="section-title">Memory Activity (Last Year)</div>
+          <div class="heatmap-months" id="heatmap-months"></div>
+          <div class="heatmap-body">
+            <div class="heatmap-days">
+              <span></span>
+              <span>Mon</span>
+              <span></span>
+              <span>Wed</span>
+              <span></span>
+              <span>Fri</span>
+              <span></span>
+            </div>
+            <div class="heatmap-grid" id="heatmap"></div>
+          </div>
+          <div class="heatmap-legend">
+            Less
+            <div class="heatmap-legend-cell" style="background: #161b22; border: 1px solid #21262d;"></div>
+            <div class="heatmap-legend-cell" style="background: #0e4429;"></div>
+            <div class="heatmap-legend-cell" style="background: #006d32;"></div>
+            <div class="heatmap-legend-cell" style="background: #26a641;"></div>
+            <div class="heatmap-legend-cell" style="background: #39d353;"></div>
+            More
+          </div>
+          <div class="heatmap-tooltip" id="heatmap-tooltip"></div>
+        </div>
+
+        <div class="growth-section">
+          <div class="section-title">Memory Growth (Last 14 Days)</div>
+          <div class="growth-chart" id="growth-chart"></div>
+        </div>
+
+        <div class="timeline-section">
+          <div class="section-title" style="margin-bottom: 20px;">Daily Memory Timeline</div>
+          <div class="timeline" id="timeline"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal for full memory view -->
+  <div id="modal-overlay" class="modal-overlay" onclick="closeModal(event)">
+    <div class="modal" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <div class="modal-header-content">
+          <div class="modal-title" id="modal-title"></div>
+          <div class="modal-meta" id="modal-meta"></div>
+        </div>
+        <button class="modal-close" onclick="closeModal()">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M18 6L6 18M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-content" id="modal-content"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Mock data for screenshot
+    const mockMemories = [
+      {
+        subject: "Implemented user authentication with JWT tokens",
+        content: "Added JWT-based authentication to the API server. Created login/logout endpoints, middleware for token validation, and refresh token rotation. Used bcrypt for password hashing with salt rounds of 12.",
+        project: "api-server",
+        date: "2026-02-03",
+        time: "2:15 PM"
+      },
+      {
+        subject: "Fixed memory search returning empty results",
+        content: "Debugged issue where memory search was returning 0 results despite API returning data. Root cause was a mismatch in the expected response structure - API returns flat array under result.memories but code expected nested structure.",
+        project: "evermem-plugin",
+        date: "2026-02-03",
+        time: "11:42 AM"
+      },
+      {
+        subject: "Created dashboard visualization components",
+        content: "Built GitHub-style activity heatmap, 14-day growth chart, and daily timeline view. Used vanilla JS with CSS grid for responsive layout. Added tooltips and hover states for better UX.",
+        project: "web-dashboard",
+        date: "2026-02-03",
+        time: "9:30 AM"
+      },
+      {
+        subject: "Refactored database connection pooling",
+        content: "Switched from single connection to connection pool with max 20 connections. Added health checks and automatic reconnection on failure. Reduced query latency by 40%.",
+        project: "api-server",
+        date: "2026-02-02",
+        time: "4:20 PM"
+      },
+      {
+        subject: "Added TypeScript strict mode",
+        content: "Enabled strict mode in tsconfig.json and fixed all resulting type errors. Added proper null checks and type guards throughout the codebase. Improved type coverage from 78% to 96%.",
+        project: "evermem-plugin",
+        date: "2026-02-02",
+        time: "2:45 PM"
+      },
+      {
+        subject: "Implemented rate limiting middleware",
+        content: "Added sliding window rate limiter using Redis. Default limit is 100 requests per minute per API key. Returns 429 status with Retry-After header when exceeded.",
+        project: "api-server",
+        date: "2026-02-02",
+        time: "10:15 AM"
+      },
+      {
+        subject: "Set up CI/CD pipeline with GitHub Actions",
+        content: "Created workflow for automated testing on PR, staging deployment on merge to develop, and production deployment on release tags. Added test coverage reporting with Codecov integration.",
+        project: "web-dashboard",
+        date: "2026-02-01",
+        time: "3:30 PM"
+      },
+      {
+        subject: "Optimized memory retrieval query",
+        content: "Reduced query time from 800ms to 120ms by adding composite index on (user_id, timestamp). Also implemented cursor-based pagination instead of offset for better performance on large datasets.",
+        project: "api-server",
+        date: "2026-02-01",
+        time: "11:00 AM"
+      }
+    ];
+
+    // Generate mock heatmap data
+    function generateMockHeatmap() {
+      const container = document.getElementById('heatmap');
+      const monthsContainer = document.getElementById('heatmap-months');
+      const today = new Date();
+
+      // Generate activity pattern (more recent = more active)
+      const activityData = {};
+      for (let i = 0; i < 365; i++) {
+        const date = new Date(today);
+        date.setDate(date.getDate() - i);
+        const dateStr = formatLocalDate(date);
+
+        // Higher chance of activity for recent dates
+        const recentBonus = Math.max(0, (60 - i) / 60);
+        const weekdayBonus = date.getDay() !== 0 && date.getDay() !== 6 ? 0.3 : 0;
+        const random = Math.random();
+
+        if (random < 0.15 + recentBonus * 0.4 + weekdayBonus) {
+          const intensity = Math.floor(Math.random() * 4) + 1;
+          activityData[dateStr] = Math.min(4, intensity + (recentBonus > 0.5 ? 1 : 0));
+        }
+      }
+
+      // Find the Sunday ~1 year ago
+      const startDate = new Date(today);
+      startDate.setDate(startDate.getDate() - 364);
+      while (startDate.getDay() !== 0) {
+        startDate.setDate(startDate.getDate() - 1);
+      }
+
+      // Build weeks
+      const weeks = [];
+      let currentWeek = [];
+      const months = new Map();
+      let currentDate = new Date(startDate);
+
+      while (currentDate <= today) {
+        const dateStr = formatLocalDate(currentDate);
+        const monthKey = currentDate.toLocaleDateString('en-US', { month: 'short' });
+
+        if (!months.has(monthKey)) {
+          months.set(monthKey, weeks.length);
+        }
+
+        currentWeek.push({
+          date: dateStr,
+          count: activityData[dateStr] || 0,
+          dayOfWeek: currentDate.getDay()
+        });
+
+        if (currentDate.getDay() === 6) {
+          weeks.push(currentWeek);
+          currentWeek = [];
+        }
+
+        currentDate.setDate(currentDate.getDate() + 1);
+      }
+
+      if (currentWeek.length > 0) {
+        weeks.push(currentWeek);
+      }
+
+      // Render month labels
+      const weekWidth = 16;
+      months.forEach((weekIndex, monthName) => {
+        const span = document.createElement('span');
+        span.textContent = monthName;
+        span.style.left = `${weekIndex * weekWidth}px`;
+        monthsContainer.appendChild(span);
+      });
+
+      // Render weeks
+      weeks.forEach((week, weekIndex) => {
+        const weekDiv = document.createElement('div');
+        weekDiv.className = 'heatmap-week';
+
+        if (weekIndex === 0 && week[0].dayOfWeek !== 0) {
+          for (let i = 0; i < week[0].dayOfWeek; i++) {
+            const emptyCell = document.createElement('div');
+            emptyCell.className = 'heatmap-cell';
+            emptyCell.style.visibility = 'hidden';
+            weekDiv.appendChild(emptyCell);
+          }
+        }
+
+        week.forEach(day => {
+          const cell = document.createElement('div');
+          cell.className = 'heatmap-cell';
+          if (day.count >= 4) cell.classList.add('level-4');
+          else if (day.count >= 3) cell.classList.add('level-3');
+          else if (day.count >= 2) cell.classList.add('level-2');
+          else if (day.count >= 1) cell.classList.add('level-1');
+          weekDiv.appendChild(cell);
+        });
+
+        if (weekIndex === weeks.length - 1 && week[week.length - 1].dayOfWeek !== 6) {
+          for (let i = week[week.length - 1].dayOfWeek + 1; i <= 6; i++) {
+            const emptyCell = document.createElement('div');
+            emptyCell.className = 'heatmap-cell';
+            emptyCell.style.visibility = 'hidden';
+            weekDiv.appendChild(emptyCell);
+          }
+        }
+
+        container.appendChild(weekDiv);
+      });
+    }
+
+    // Generate mock growth chart
+    function generateMockGrowthChart() {
+      const container = document.getElementById('growth-chart');
+      const data = [2, 0, 4, 3, 1, 5, 2, 3, 6, 4, 2, 5, 3, 4];
+      const maxCount = Math.max(...data);
+      const today = new Date();
+
+      data.forEach((count, i) => {
+        const date = new Date(today);
+        date.setDate(date.getDate() - (13 - i));
+
+        const barContainer = document.createElement('div');
+        barContainer.className = 'chart-bar-container';
+
+        const barWrapper = document.createElement('div');
+        barWrapper.className = 'chart-bar-wrapper';
+
+        const bar = document.createElement('div');
+        bar.className = 'chart-bar';
+        bar.style.height = count > 0 ? `${(count / maxCount) * 100}%` : '4px';
+        bar.style.opacity = count > 0 ? '1' : '0.2';
+
+        const tooltip = document.createElement('div');
+        tooltip.className = 'bar-tooltip';
+        tooltip.textContent = `${count} memories`;
+        bar.appendChild(tooltip);
+
+        const label = document.createElement('div');
+        label.className = 'chart-label';
+        label.textContent = date.getDate();
+
+        barWrapper.appendChild(bar);
+        barContainer.appendChild(barWrapper);
+        barContainer.appendChild(label);
+        container.appendChild(barContainer);
+      });
+    }
+
+    // Generate mock timeline
+    function generateMockTimeline() {
+      const container = document.getElementById('timeline');
+      const byDate = {};
+
+      mockMemories.forEach(mem => {
+        if (!byDate[mem.date]) byDate[mem.date] = [];
+        byDate[mem.date].push(mem);
+      });
+
+      const dates = Object.keys(byDate).sort().reverse();
+      const todayStr = formatLocalDate(new Date());
+
+      dates.forEach(date => {
+        const dayMemories = byDate[date];
+        const dayDiv = document.createElement('div');
+        dayDiv.className = 'timeline-day';
+
+        const dot = document.createElement('div');
+        dot.className = 'timeline-dot' + (date === todayStr ? ' today' : '');
+        dayDiv.appendChild(dot);
+
+        const header = document.createElement('div');
+        header.className = 'day-header';
+
+        const dateDisplay = new Date(date + 'T12:00:00').toLocaleDateString('en-US', {
+          weekday: 'long', month: 'short', day: 'numeric'
+        });
+
+        header.innerHTML = `
+          <span class="day-date">${dateDisplay}</span>
+          ${date === todayStr ? '<span class="day-badge">Today</span>' : ''}
+          <span class="day-stats">${dayMemories.length} ${dayMemories.length === 1 ? 'memory' : 'memories'}</span>
+        `;
+        dayDiv.appendChild(header);
+
+        const cardsDiv = document.createElement('div');
+        cardsDiv.className = 'memory-cards';
+
+        dayMemories.forEach(memory => {
+          const card = document.createElement('div');
+          card.className = 'memory-card';
+
+          card.innerHTML = `
+            <div class="memory-card-header">
+              <div class="memory-type-dot" style="background: #58a6ff"></div>
+              <span class="memory-label">${memory.subject}</span>
+              <span class="memory-time">${memory.time}</span>
+            </div>
+            <div class="memory-project">${memory.project}</div>
+            <div class="memory-content">${memory.content}</div>
+          `;
+          cardsDiv.appendChild(card);
+        });
+
+        dayDiv.appendChild(cardsDiv);
+        container.appendChild(dayDiv);
+      });
+    }
+
+    function formatLocalDate(date) {
+      return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    }
+
+    function closeModal(event) {
+      if (event && event.target !== event.currentTarget) return;
+      document.getElementById('modal-overlay').classList.remove('visible');
+    }
+
+    // Initialize
+    generateMockHeatmap();
+    generateMockGrowthChart();
+    generateMockTimeline();
+  </script>
+</body>
+</html>

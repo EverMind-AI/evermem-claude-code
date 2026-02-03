@@ -17,6 +17,8 @@ echo -e "${CYAN}    ██╔══╝  ╚██╗ ██╔╝██╔══
 echo -e "${CYAN}    ███████╗ ╚████╔╝ ███████╗██║  ██║██║ ╚═╝ ██║███████╗██║ ╚═╝ ██║${NC}"
 echo -e "${CYAN}    ╚══════╝  ╚═══╝  ╚══════╝╚═╝  ╚═╝╚═╝     ╚═╝╚══════╝╚═╝     ╚═╝${NC}"
 echo ""
+echo -e "${YELLOW}                        牛 马 日 记${NC}"
+echo ""
 echo -e "              ${GREEN}Plugin for Claude Code${NC}"
 echo ""
 

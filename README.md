@@ -2,6 +2,8 @@
 
 Persistent memory for Claude Code. Automatically saves and recalls context from past coding sessions.
 
+![Memory Hub Screenshot](assets/hub-screenshot.png)
+
 ## Features
 
 - **Automatic Memory Recall** - Relevant memories are retrieved when you submit a prompt
