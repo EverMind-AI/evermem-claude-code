@@ -130,10 +130,10 @@ if [[ -z "$SCRIPT_DIR" ]]; then
     echo "Downloading EverMem plugin..."
     if [[ -d "$PLUGIN_DIR" ]]; then
         echo "Updating existing installation..."
-        cd "$PLUGIN_DIR" && git pull --quiet 2>/dev/null || {
+        if ! git -C "$PLUGIN_DIR" pull --quiet 2>/dev/null; then
             rm -rf "$PLUGIN_DIR"
             git clone --quiet "$REPO_URL" "$PLUGIN_DIR"
-        }
+        fi
     else
         git clone --quiet "$REPO_URL" "$PLUGIN_DIR"
     fi
