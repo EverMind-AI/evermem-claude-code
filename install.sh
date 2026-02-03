@@ -125,39 +125,12 @@ echo -e "${YELLOW}  Step 2: Install Plugin${NC}"
 echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 
-REPO_URL="https://github.com/EverMind-AI/evermem-claude-code.git"
-PLUGIN_DIR="$HOME/.evermem"
+REPO_URL="https://github.com/EverMind-AI/evermem-claude-code"
 
-# Check if we're running from a cloned repo or via curl
-SCRIPT_DIR=""
-# BASH_SOURCE[0] is empty when running via 'bash -c' (curl pipe)
-if [[ -n "${BASH_SOURCE[0]}" ]]; then
-    POSSIBLE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
-    if [[ -n "$POSSIBLE_DIR" && -f "$POSSIBLE_DIR/.claude-plugin/marketplace.json" ]]; then
-        SCRIPT_DIR="$POSSIBLE_DIR"
-    fi
-fi
-
-# If not running from repo, clone it
-if [[ -z "$SCRIPT_DIR" ]]; then
-    echo "Downloading EverMem plugin..."
-    if [[ -d "$PLUGIN_DIR" ]]; then
-        echo "Updating existing installation..."
-        if ! git -C "$PLUGIN_DIR" pull --quiet 2>/dev/null; then
-            rm -rf "$PLUGIN_DIR"
-            git clone --quiet "$REPO_URL" "$PLUGIN_DIR"
-        fi
-    else
-        git clone --quiet "$REPO_URL" "$PLUGIN_DIR"
-    fi
-    SCRIPT_DIR="$PLUGIN_DIR"
-    echo -e "${GREEN}✓${NC} Plugin downloaded to $PLUGIN_DIR"
-fi
-
-# Add marketplace from local clone
+# Add marketplace directly from GitHub (allows update tracking)
 echo "Adding EverMem marketplace..."
 claude plugin marketplace remove evermem 2>/dev/null || true
-if claude plugin marketplace add "$SCRIPT_DIR" 2>&1 | grep -q "Successfully"; then
+if claude plugin marketplace add "$REPO_URL" 2>&1 | grep -q "Successfully"; then
     echo -e "${GREEN}✓${NC} Marketplace added"
 else
     echo -e "${RED}❌ Failed to add marketplace${NC}"

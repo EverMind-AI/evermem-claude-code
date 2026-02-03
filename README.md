@@ -45,12 +45,18 @@ source ~/.zshrc  # or source ~/.bashrc
 ### 3. Install the Plugin
 
 ```bash
-# Clone the repository
-git clone https://github.com/EverMind-AI/evermem-claude-code.git ~/.evermem
+# Add marketplace from GitHub (tracks updates automatically)
+claude plugin marketplace add https://github.com/EverMind-AI/evermem-claude-code
 
-# Add marketplace and install
-claude plugin marketplace add ~/.evermem
+# Install the plugin
 claude plugin install evermem@evermem --scope user
+```
+
+To update the plugin later:
+
+```bash
+claude plugin marketplace update evermem
+claude plugin update evermem@evermem
 ```
 
 ### 4. Verify Installation
