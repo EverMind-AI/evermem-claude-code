@@ -61,7 +61,7 @@ echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━�
 echo -e "${YELLOW}  Step 1: Configure API Key${NC}"
 echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
-echo "Get your API key from: https://evermind.ai/dashboard/api-keys"
+echo "Get your API key from: https://console.evermind.ai/"
 echo ""
 
 # Check if API key already exists
@@ -174,5 +174,5 @@ echo "Or simply restart your terminal."
 echo ""
 echo "Your conversations with Claude Code will now be remembered!"
 echo ""
-echo "Need help? Visit: https://evermind.ai/docs"
+echo "Need help? Run /evermem:help in Claude Code"
 echo ""
