@@ -526,10 +526,6 @@
           <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
         </svg>
       </button>
-      <input type="text" id="search-input" class="search-input" placeholder="Search memories..." style="display: none;" oninput="filterMemories()" />
-      <select id="project-filter" class="filter-select" style="display: none;" onchange="filterMemories()">
-        <option value="">All Projects</option>
-      </select>
     </div>
     <span class="stats" id="stats">Enter API key to load memories</span>
   </div>
@@ -662,12 +658,10 @@
           `;
           document.getElementById('stats').textContent = '0 memories';
         } else {
-          // Show controls
+          // Show refresh button
           document.getElementById('refresh-btn').style.display = 'flex';
-          document.getElementById('search-input').style.display = 'block';
-          document.getElementById('project-filter').style.display = 'block';
-          populateProjectFilter();
           renderDashboard();
+          populateProjectFilter();
         }
       } catch (error) {
         document.getElementById('content').innerHTML = `
@@ -819,7 +813,13 @@
         </div>
 
         <div class="timeline-section">
-          <div class="section-title" style="margin-bottom: 20px;">Daily Memory Timeline</div>
+          <div class="section-title" style="margin-bottom: 16px;">Daily Memory Timeline</div>
+          <div class="timeline-filters" style="display: flex; gap: 12px; margin-bottom: 20px;">
+            <input type="text" id="search-input" class="search-input" placeholder="Search memories..." style="flex: 1; max-width: 300px;" oninput="filterMemories()" />
+            <select id="project-filter" class="filter-select" onchange="filterMemories()">
+              <option value="">All Projects</option>
+            </select>
+          </div>
           <div class="timeline" id="timeline"></div>
         </div>
       `;
