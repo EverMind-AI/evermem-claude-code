@@ -49,14 +49,15 @@
     .filter-select { min-width: 120px; cursor: pointer; }
     .api-input:focus, .search-input:focus, .filter-select:focus {
       outline: none;
-      border-color: #58a6ff;
+      border-color: #FFC53D;
     }
     .api-btn, .refresh-btn {
       padding: 6px 12px;
-      background: #238636;
+      background: #FFC53D;
       border: none;
       border-radius: 6px;
-      color: #fff;
+      color: #0d1117;
+      font-weight: 600;
       font-size: 13px;
       cursor: pointer;
       transition: background 0.2s;
@@ -64,7 +65,7 @@
       align-items: center;
       gap: 4px;
     }
-    .api-btn:hover, .refresh-btn:hover { background: #2ea043; }
+    .api-btn:hover, .refresh-btn:hover { background: #e6b038; }
     .api-btn:disabled, .refresh-btn:disabled { background: #30363d; cursor: not-allowed; }
     .refresh-btn { background: #30363d; }
     .refresh-btn:hover { background: #3d444d; }
@@ -89,7 +90,7 @@
       width: 32px;
       height: 32px;
       border: 3px solid #30363d;
-      border-top-color: #58a6ff;
+      border-top-color: #FFC53D;
       border-radius: 50%;
       animation: spin 1s linear infinite;
       margin: 0 auto 16px;
@@ -134,7 +135,7 @@
     }
     .stat-card .trend {
       font-size: 12px;
-      color: #3fb950;
+      color: #FFC53D;
       margin-top: 4px;
     }
     .stat-card .trend.neutral { color: #8b949e; }
@@ -236,19 +237,36 @@
     }
     .heatmap-legend-cell { width: 12px; height: 12px; border-radius: 2px; }
 
+    .charts-row {
+      display: flex;
+      gap: 24px;
+      margin-bottom: 32px;
+    }
+    .charts-row .heatmap-section {
+      flex: 1;
+      margin-bottom: 0;
+    }
+    .charts-row .growth-section {
+      flex: 1;
+      min-width: 280px;
+    }
+    @media (max-width: 900px) {
+      .charts-row {
+        flex-direction: column;
+      }
+    }
     .growth-section {
       background: #161b22;
       border: 1px solid #30363d;
       border-radius: 12px;
-      padding: 24px;
-      margin-bottom: 32px;
+      padding: 20px;
     }
     .growth-chart {
       display: flex;
       align-items: flex-end;
-      gap: 8px;
-      height: 150px;
-      padding: 0 8px;
+      gap: 6px;
+      height: 120px;
+      padding: 0 4px;
     }
     .chart-bar-container {
       flex: 1;
@@ -265,7 +283,7 @@
     }
     .chart-bar {
       width: 100%;
-      background: linear-gradient(to top, #238636, #3fb950);
+      background: linear-gradient(to top, #e6b038, #FFC53D);
       border-radius: 4px 4px 0 0;
       min-height: 4px;
       transition: height 0.3s ease;
@@ -311,26 +329,26 @@
       top: 4px;
       width: 16px;
       height: 16px;
-      background: #238636;
+      background: #FFC53D;
       border: 3px solid #0d1117;
       border-radius: 50%;
       z-index: 1;
     }
     .timeline-dot.today {
-      background: #58a6ff;
-      box-shadow: 0 0 12px rgba(88, 166, 255, 0.4);
+      background: #FFC53D;
+      box-shadow: 0 0 12px rgba(255, 197, 61, 0.5);
     }
     .timeline-dot.highlighted {
-      background: #f0883e;
-      box-shadow: 0 0 12px rgba(240, 136, 62, 0.4);
+      background: #fff;
+      box-shadow: 0 0 12px rgba(255, 255, 255, 0.6);
     }
     .day-header { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
     .day-date { font-size: 14px; font-weight: 600; color: #f0f6fc; }
     .day-badge {
       font-size: 11px;
       padding: 2px 8px;
-      background: #388bfd22;
-      color: #58a6ff;
+      background: #FFC53D22;
+      color: #FFC53D;
       border-radius: 10px;
     }
     .day-stats { font-size: 12px; color: #8b949e; }
@@ -347,13 +365,34 @@
       transition: border-color 0.2s, transform 0.2s;
       cursor: pointer;
     }
-    .memory-card:hover { border-color: #58a6ff; transform: translateY(-2px); }
+    .memory-card:hover { border-color: #FFC53D; transform: translateY(-2px); }
     .memory-card.hidden { display: none; }
     .memory-card-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
-    .memory-type-dot { width: 8px; height: 8px; border-radius: 50%; }
+    .memory-emoji { font-size: 16px; flex-shrink: 0; }
     .memory-label { font-size: 13px; font-weight: 500; color: #f0f6fc; flex: 1; }
     .memory-time { font-size: 11px; color: #8b949e; }
-    .memory-project { font-size: 11px; color: #8b949e; margin-bottom: 6px; font-family: monospace; }
+    .memory-project {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 10px;
+      color: #8b949e;
+      margin-bottom: 8px;
+      font-family: monospace;
+      background: #21262d;
+      padding: 3px 8px;
+      border-radius: 12px;
+      max-width: 100%;
+    }
+    .memory-project::before {
+      content: '📁';
+      font-size: 10px;
+    }
+    .memory-project span {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
     .memory-content {
       font-size: 12px;
       color: #8b949e;
@@ -471,10 +510,10 @@
       border: 1px solid #30363d;
     }
     .conversation-message.user {
-      border-left: 3px solid #58a6ff;
+      border-left: 3px solid #FFC53D;
     }
     .conversation-message.assistant {
-      border-left: 3px solid #3fb950;
+      border-left: 3px solid #FFC53D;
     }
     .conversation-header {
       display: flex;
@@ -487,8 +526,8 @@
       font-weight: 600;
       color: #f0f6fc;
     }
-    .conversation-speaker.user { color: #58a6ff; }
-    .conversation-speaker.assistant { color: #3fb950; }
+    .conversation-speaker.user { color: #FFC53D; }
+    .conversation-speaker.assistant { color: #FFC53D; }
     .conversation-time {
       color: #8b949e;
     }
@@ -586,7 +625,7 @@
             <strong>Server not running</strong>
             <p style="margin-top: 8px; color: #c9d1d9;">The Memory Hub requires a local server to communicate with the EverMind API.</p>
             <p style="margin-top: 8px; color: #8b949e;">Start the server with:</p>
-            <pre style="margin-top: 8px; padding: 12px; background: #0d1117; border-radius: 6px; font-family: monospace; color: #58a6ff;">node server/proxy.js</pre>
+            <pre style="margin-top: 8px; padding: 12px; background: #0d1117; border-radius: 6px; font-family: monospace; color: #FFC53D;">node server/proxy.js</pre>
             <p style="margin-top: 8px; color: #8b949e;">Then refresh this page.</p>
           </div>
         `;
@@ -780,37 +819,39 @@
           </div>
         </div>
 
-        <div class="heatmap-section">
-          <div class="section-title">Memory Activity (Last Year)</div>
-          <div class="heatmap-months" id="heatmap-months"></div>
-          <div class="heatmap-body">
-            <div class="heatmap-days">
-              <span></span>
-              <span>Mon</span>
-              <span></span>
-              <span>Wed</span>
-              <span></span>
-              <span>Fri</span>
-              <span></span>
+        <div class="charts-row">
+          <div class="heatmap-section">
+            <div class="section-title">Memory Activity (6 months)</div>
+            <div class="heatmap-months" id="heatmap-months"></div>
+            <div class="heatmap-body">
+              <div class="heatmap-days">
+                <span></span>
+                <span>Mon</span>
+                <span></span>
+                <span>Wed</span>
+                <span></span>
+                <span>Fri</span>
+                <span></span>
+              </div>
+              <div class="heatmap-grid" id="heatmap"></div>
             </div>
-            <div class="heatmap-grid" id="heatmap"></div>
+            <div class="heatmap-legend">
+              <span>Less</span>
+              <div class="heatmap-legend-cell" style="background: #161b22; border: 1px solid #21262d;"></div>
+              <div class="heatmap-legend-cell" style="background: #0e4429;"></div>
+              <div class="heatmap-legend-cell" style="background: #006d32;"></div>
+              <div class="heatmap-legend-cell" style="background: #26a641;"></div>
+              <div class="heatmap-legend-cell" style="background: #39d353;"></div>
+              <span>More</span>
+            </div>
           </div>
-          <div class="heatmap-legend">
-            Less
-            <div class="heatmap-legend-cell" style="background: #161b22; border: 1px solid #21262d;"></div>
-            <div class="heatmap-legend-cell" style="background: #0e4429;"></div>
-            <div class="heatmap-legend-cell" style="background: #006d32;"></div>
-            <div class="heatmap-legend-cell" style="background: #26a641;"></div>
-            <div class="heatmap-legend-cell" style="background: #39d353;"></div>
-            More
-          </div>
-          <div class="heatmap-tooltip" id="heatmap-tooltip"></div>
-        </div>
 
-        <div class="growth-section">
-          <div class="section-title">Memory Growth (Last 14 Days)</div>
-          <div class="growth-chart" id="growth-chart"></div>
+          <div class="growth-section">
+            <div class="section-title">Last 7 Days</div>
+            <div class="growth-chart" id="growth-chart"></div>
+          </div>
         </div>
+        <div class="heatmap-tooltip" id="heatmap-tooltip"></div>
 
         <div class="timeline-section">
           <div class="section-title" style="margin-bottom: 16px;">Daily Memory Timeline</div>
@@ -881,9 +922,9 @@
       const monthsContainer = document.getElementById('heatmap-months');
       const today = new Date();
 
-      // Find the Sunday ~1 year ago
+      // Find the Sunday ~6 months ago (26 weeks)
       const startDate = new Date(today);
-      startDate.setDate(startDate.getDate() - 364);
+      startDate.setDate(startDate.getDate() - 182);
       while (startDate.getDay() !== 0) {
         startDate.setDate(startDate.getDate() - 1);
       }
@@ -961,6 +1002,7 @@
 
           cell.addEventListener('mouseenter', showHeatmapTooltip);
           cell.addEventListener('mouseleave', hideHeatmapTooltip);
+          cell.addEventListener('click', () => scrollToDay(day.date));
           weekDiv.appendChild(cell);
         });
 
@@ -1009,18 +1051,38 @@
       tooltip.style.display = 'none';
     }
 
+    function scrollToDay(dateStr) {
+      const dayEl = document.querySelector(`.timeline-day[data-date="${dateStr}"]`);
+      if (dayEl) {
+        // Remove previous highlight
+        document.querySelectorAll('.timeline-dot.highlighted').forEach(el => {
+          el.classList.remove('highlighted');
+        });
+
+        // Scroll to day
+        dayEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+        // Highlight the dot
+        const dot = dayEl.querySelector('.timeline-dot');
+        if (dot) {
+          dot.classList.add('highlighted');
+          setTimeout(() => dot.classList.remove('highlighted'), 2000);
+        }
+      }
+    }
+
     function buildGrowthChart(memoriesByDate) {
       const chartContainer = document.getElementById('growth-chart');
       const today = new Date();
 
       const dailyData = [];
-      for (let i = 13; i >= 0; i--) {
+      for (let i = 6; i >= 0; i--) {
         const date = new Date(today);
         date.setDate(date.getDate() - i);
         const dateStr = formatLocalDate(date);
-        const displayDate = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        const dayName = date.toLocaleDateString('en-US', { weekday: 'short' });
         dailyData.push({
-          date: displayDate,
+          date: dayName,
           count: memoriesByDate[dateStr] || 0
         });
       }
@@ -1046,7 +1108,7 @@
 
         const label = document.createElement('div');
         label.className = 'chart-label';
-        label.textContent = day.date.split(' ')[1];
+        label.textContent = day.date;
 
         barWrapper.appendChild(bar);
         barContainer.appendChild(barWrapper);
@@ -1114,14 +1176,15 @@
           const displaySubject = memory.subject || (memory.content.length > 40 ? memory.content.slice(0, 40) + '...' : memory.content);
           const displayContent = memory.content.length > 150 ? memory.content.slice(0, 150) + '...' : memory.content;
           const projectName = memory.groupId ? memory.groupId.replace(/^claude-code:/, '') : '';
+          const emoji = getEmojiForContent(memory.subject || memory.content);
 
           card.innerHTML = `
             <div class="memory-card-header">
-              <div class="memory-type-dot" style="background: #58a6ff"></div>
+              <span class="memory-emoji">${emoji}</span>
               <span class="memory-label">${escapeHtml(displaySubject)}</span>
               <span class="memory-time">${memory.time}</span>
             </div>
-            ${projectName ? `<div class="memory-project">${escapeHtml(projectName)}</div>` : ''}
+            ${projectName ? `<div class="memory-project"><span>${escapeHtml(projectName)}</span></div>` : ''}
             <div class="memory-content">${escapeHtml(displayContent)}</div>
           `;
           cardsDiv.appendChild(card);
@@ -1155,6 +1218,198 @@
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') closeModal();
     });
+
+    // Keyword to emoji mapping (checked in order, first match wins)
+    const emojiKeywords = [
+      // Programming Actions
+      ['debug', '🐛'], ['bug', '🐛'], ['fix', '🔧'], ['repair', '🔧'], ['patch', '🩹'],
+      ['error', '❌'], ['fail', '❌'], ['crash', '💥'], ['broken', '💔'],
+      ['test', '🧪'], ['spec', '🧪'], ['jest', '🧪'], ['mocha', '🧪'], ['pytest', '🧪'],
+      ['add', '➕'], ['create', '✨'], ['new', '🆕'], ['implement', '🛠️'],
+      ['remove', '🗑️'], ['delete', '🗑️'], ['clean', '🧹'], ['prune', '✂️'],
+      ['update', '✏️'], ['change', '📝'], ['modify', '🔄'], ['edit', '✏️'],
+      ['refactor', '♻️'], ['rewrite', '♻️'], ['restructure', '🏗️'],
+      ['optimize', '⚡'], ['performance', '🚀'], ['speed', '💨'], ['fast', '⚡'],
+      ['merge', '🔀'], ['rebase', '🔀'], ['cherry-pick', '🍒'],
+      ['deploy', '🚀'], ['release', '📦'], ['publish', '📤'], ['ship', '🚢'],
+      ['rollback', '⏪'], ['revert', '↩️'], ['undo', '↩️'],
+      ['install', '📥'], ['setup', '🔧'], ['configure', '⚙️'], ['init', '🎬'],
+      ['upgrade', '⬆️'], ['downgrade', '⬇️'], ['migrate', '🚚'],
+      ['build', '🏗️'], ['compile', '⚙️'], ['bundle', '📦'],
+      ['lint', '🧹'], ['format', '💅'], ['prettier', '💅'], ['eslint', '🧹'],
+      ['commit', '📝'], ['push', '📤'], ['pull', '📥'], ['fetch', '📡'],
+      ['branch', '🌿'], ['checkout', '🔀'], ['stash', '📦'],
+
+      // Programming Concepts
+      ['api', '🔌'], ['endpoint', '🎯'], ['route', '🛤️'], ['rest', '🔌'], ['graphql', '◼️'],
+      ['database', '🗄️'], ['db', '🗄️'], ['sql', '🗄️'], ['query', '🔍'], ['schema', '📋'],
+      ['mongo', '🍃'], ['postgres', '🐘'], ['mysql', '🐬'], ['redis', '🔴'], ['sqlite', '📁'],
+      ['auth', '🔐'], ['login', '🔑'], ['logout', '🚪'], ['password', '🔒'], ['token', '🎟️'],
+      ['oauth', '🔐'], ['jwt', '🎫'], ['session', '🎫'], ['cookie', '🍪'],
+      ['cache', '💾'], ['memory', '🧠'], ['storage', '💽'], ['store', '🏪'],
+      ['queue', '📬'], ['job', '⚙️'], ['worker', '👷'], ['cron', '⏰'], ['schedule', '📅'],
+      ['webhook', '🪝'], ['callback', '📞'], ['event', '📡'], ['listener', '👂'],
+      ['middleware', '🔗'], ['plugin', '🔌'], ['extension', '🧩'], ['module', '📦'],
+      ['component', '🧩'], ['widget', '🎛️'], ['element', '🔲'],
+      ['state', '📊'], ['redux', '💜'], ['context', '🌐'], ['props', '📨'],
+      ['hook', '🪝'], ['effect', '✨'], ['ref', '👉'], ['memo', '📝'],
+      ['async', '⏳'], ['await', '⏳'], ['promise', '🤝'], ['callback', '📞'],
+      ['thread', '🧵'], ['process', '⚙️'], ['parallel', '⏸️'], ['concurrent', '🔄'],
+      ['socket', '🔌'], ['websocket', '🌐'], ['stream', '🌊'], ['pipe', '🚰'],
+      ['encryption', '🔐'], ['decrypt', '🔓'], ['hash', '#️⃣'], ['salt', '🧂'],
+      ['validate', '✅'], ['sanitize', '🧼'], ['escape', '🏃'], ['encode', '🔢'],
+      ['parse', '📖'], ['serialize', '📝'], ['json', '{}'], ['xml', '📄'], ['yaml', '📋'],
+      ['regex', '🔤'], ['pattern', '🎨'], ['match', '🎯'], ['search', '🔍'], ['find', '🔎'],
+      ['sort', '📊'], ['filter', '🔍'], ['map', '🗺️'], ['reduce', '📉'], ['loop', '🔁'],
+      ['array', '📚'], ['list', '📝'], ['object', '📦'], ['class', '🏛️'], ['function', '⚡'],
+      ['variable', '📌'], ['constant', '🔒'], ['type', '🏷️'], ['interface', '📐'],
+      ['import', '📥'], ['export', '📤'], ['require', '📦'], ['dependency', '🔗'],
+      ['exception', '⚠️'], ['throw', '🎯'], ['catch', '🥅'], ['try', '🎲'],
+      ['log', '📋'], ['console', '🖥️'], ['print', '🖨️'], ['debug', '🐛'], ['trace', '👣'],
+
+      // Languages & Frameworks
+      ['javascript', '💛'], ['js', '💛'], ['typescript', '💙'], ['ts', '💙'],
+      ['python', '🐍'], ['py', '🐍'], ['ruby', '💎'], ['rb', '💎'],
+      ['java', '☕'], ['kotlin', '🟣'], ['scala', '🔴'], ['groovy', '🎸'],
+      ['go', '🐹'], ['golang', '🐹'], ['rust', '🦀'], ['swift', '🦅'],
+      ['php', '🐘'], ['laravel', '🔴'], ['symfony', '⚫'],
+      ['csharp', '💜'], ['c#', '💜'], ['dotnet', '💜'], ['.net', '💜'],
+      ['cpp', '🔵'], ['c++', '🔵'], ['c lang', '©️'],
+      ['html', '🌐'], ['css', '🎨'], ['sass', '💗'], ['less', '🔵'], ['tailwind', '🌊'],
+      ['react', '⚛️'], ['vue', '💚'], ['angular', '🅰️'], ['svelte', '🧡'],
+      ['next', '▲'], ['nuxt', '💚'], ['gatsby', '💜'], ['remix', '💿'],
+      ['node', '💚'], ['express', '⚡'], ['fastify', '🚀'], ['nest', '🐱'],
+      ['deno', '🦕'], ['bun', '🥟'],
+      ['django', '🎸'], ['flask', '🌶️'], ['fastapi', '⚡'],
+      ['rails', '🛤️'], ['sinatra', '🎤'],
+      ['spring', '🌱'], ['hibernate', '🐻'],
+      ['electron', '⚡'], ['tauri', '🦀'],
+      ['flutter', '🦋'], ['dart', '🎯'], ['react native', '📱'],
+      ['unity', '🎮'], ['unreal', '🎮'], ['godot', '🤖'],
+
+      // Tools & Services
+      ['docker', '🐳'], ['container', '📦'], ['kubernetes', '☸️'], ['k8s', '☸️'],
+      ['git', '📚'], ['github', '🐙'], ['gitlab', '🦊'], ['bitbucket', '🪣'],
+      ['npm', '📦'], ['yarn', '🧶'], ['pnpm', '📦'], ['pip', '📦'], ['cargo', '📦'],
+      ['webpack', '📦'], ['vite', '⚡'], ['rollup', '📜'], ['esbuild', '⚡'], ['parcel', '📦'],
+      ['babel', '🔄'], ['swc', '⚡'], ['tsc', '💙'],
+      ['aws', '☁️'], ['azure', '☁️'], ['gcp', '☁️'], ['cloud', '☁️'],
+      ['s3', '🪣'], ['ec2', '🖥️'], ['lambda', 'λ'], ['serverless', '⚡'],
+      ['vercel', '▲'], ['netlify', '🔷'], ['heroku', '💜'], ['railway', '🚂'],
+      ['firebase', '🔥'], ['supabase', '⚡'], ['planetscale', '🪐'],
+      ['nginx', '🟩'], ['apache', '🪶'], ['caddy', '🔒'],
+      ['linux', '🐧'], ['ubuntu', '🟠'], ['debian', '🔴'], ['macos', '🍎'], ['windows', '🪟'],
+      ['vim', '💚'], ['neovim', '💚'], ['emacs', '💜'], ['vscode', '💙'], ['ide', '🖥️'],
+      ['terminal', '💻'], ['bash', '💲'], ['zsh', '🐚'], ['shell', '🐚'], ['cli', '💻'],
+      ['postman', '📮'], ['insomnia', '😴'], ['curl', '🌀'],
+      ['figma', '🎨'], ['sketch', '💎'], ['photoshop', '🖼️'], ['illustrator', '✏️'],
+      ['slack', '💬'], ['discord', '💬'], ['teams', '👥'], ['zoom', '📹'],
+      ['jira', '📋'], ['trello', '📋'], ['notion', '📝'], ['asana', '📋'],
+      ['sentry', '🔍'], ['datadog', '🐕'], ['grafana', '📊'], ['prometheus', '🔥'],
+
+      // File Types
+      ['image', '🖼️'], ['photo', '📷'], ['picture', '🖼️'], ['png', '🖼️'], ['jpg', '🖼️'], ['svg', '🎨'],
+      ['video', '🎬'], ['movie', '🎥'], ['mp4', '🎬'], ['stream', '📺'],
+      ['audio', '🎵'], ['music', '🎶'], ['sound', '🔊'], ['mp3', '🎵'],
+      ['document', '📄'], ['pdf', '📕'], ['doc', '📄'], ['txt', '📝'],
+      ['spreadsheet', '📊'], ['excel', '📊'], ['csv', '📊'],
+      ['archive', '🗜️'], ['zip', '🗜️'], ['tar', '🗜️'], ['compress', '🗜️'],
+      ['font', '🔤'], ['icon', '🔣'], ['emoji', '😀'],
+
+      // UI/UX
+      ['button', '🔘'], ['input', '📝'], ['form', '📋'], ['field', '📝'],
+      ['modal', '🪟'], ['dialog', '💬'], ['popup', '🪟'], ['toast', '🍞'],
+      ['menu', '📋'], ['dropdown', '⬇️'], ['select', '📋'], ['option', '☑️'],
+      ['table', '📊'], ['grid', '📊'], ['list', '📝'], ['card', '🃏'],
+      ['nav', '🧭'], ['header', '📰'], ['footer', '👟'], ['sidebar', '📑'],
+      ['tab', '📑'], ['accordion', '🪗'], ['carousel', '🎠'], ['slider', '🎚️'],
+      ['chart', '📈'], ['graph', '📊'], ['pie', '🥧'], ['bar', '📊'],
+      ['loading', '⏳'], ['spinner', '🔄'], ['skeleton', '💀'], ['progress', '📶'],
+      ['scroll', '📜'], ['pagination', '📖'], ['infinite', '♾️'],
+      ['responsive', '📱'], ['mobile', '📱'], ['tablet', '📱'], ['desktop', '🖥️'],
+      ['dark mode', '🌙'], ['light mode', '☀️'], ['theme', '🎨'], ['style', '💅'],
+      ['animation', '🎬'], ['transition', '✨'], ['hover', '👆'], ['focus', '🎯'],
+      ['accessibility', '♿'], ['a11y', '♿'], ['aria', '♿'], ['screen reader', '🔊'],
+
+      // Development Process
+      ['review', '👀'], ['pr', '🔀'], ['pull request', '🔀'], ['code review', '👀'],
+      ['issue', '🎫'], ['ticket', '🎫'], ['task', '✅'], ['todo', '📋'],
+      ['sprint', '🏃'], ['agile', '🔄'], ['scrum', '🏈'], ['kanban', '📋'],
+      ['meeting', '📅'], ['standup', '🧍'], ['retro', '🔙'], ['planning', '📝'],
+      ['estimate', '🎯'], ['story', '📖'], ['epic', '📚'], ['backlog', '📋'],
+      ['milestone', '🏁'], ['deadline', '⏰'], ['release', '🎉'], ['version', '🏷️'],
+      ['documentation', '📚'], ['docs', '📖'], ['readme', '📖'], ['wiki', '📚'],
+      ['tutorial', '📚'], ['guide', '🗺️'], ['example', '💡'], ['demo', '🎪'],
+      ['comment', '💬'], ['note', '📝'], ['annotation', '🏷️'],
+
+      // Security
+      ['security', '🛡️'], ['secure', '🔒'], ['vulnerability', '⚠️'], ['exploit', '🔓'],
+      ['firewall', '🧱'], ['ddos', '💥'], ['attack', '⚔️'], ['protect', '🛡️'],
+      ['permission', '🔑'], ['role', '👤'], ['access', '🚪'], ['deny', '🚫'],
+      ['audit', '📋'], ['compliance', '✅'], ['gdpr', '🇪🇺'], ['privacy', '👁️'],
+      ['backup', '💾'], ['restore', '🔄'], ['recovery', '🔙'], ['disaster', '🆘'],
+      ['ssl', '🔒'], ['tls', '🔒'], ['https', '🔒'], ['certificate', '📜'],
+
+      // Data & Analytics
+      ['data', '📊'], ['analytics', '📈'], ['metrics', '📉'], ['stats', '📊'],
+      ['report', '📑'], ['dashboard', '📊'], ['insight', '💡'], ['trend', '📈'],
+      ['machine learning', '🤖'], ['ml', '🤖'], ['ai', '🤖'], ['model', '🧠'],
+      ['training', '🏋️'], ['dataset', '📚'], ['feature', '🎯'], ['prediction', '🔮'],
+      ['algorithm', '🧮'], ['neural', '🧠'], ['deep learning', '🧠'],
+
+      // Communication
+      ['email', '📧'], ['mail', '📬'], ['message', '💬'], ['chat', '💬'],
+      ['notification', '🔔'], ['alert', '🚨'], ['reminder', '⏰'], ['announce', '📢'],
+      ['feedback', '💭'], ['survey', '📋'], ['poll', '🗳️'], ['vote', '✋'],
+      ['support', '🆘'], ['help', '❓'], ['faq', '❔'], ['question', '❓'],
+
+      // Business
+      ['user', '👤'], ['customer', '👥'], ['client', '🤝'], ['account', '👤'],
+      ['profile', '👤'], ['avatar', '🖼️'], ['settings', '⚙️'], ['preferences', '🎛️'],
+      ['payment', '💳'], ['billing', '💰'], ['invoice', '🧾'], ['subscription', '📅'],
+      ['cart', '🛒'], ['checkout', '💳'], ['order', '📦'], ['shipping', '🚚'],
+      ['product', '📦'], ['inventory', '📦'], ['stock', '📊'], ['catalog', '📚'],
+      ['discount', '🏷️'], ['coupon', '🎟️'], ['promo', '🎉'], ['sale', '💸'],
+
+      // General
+      ['success', '✅'], ['complete', '✅'], ['done', '✅'], ['finish', '🏁'],
+      ['warning', '⚠️'], ['caution', '⚠️'], ['attention', '⚠️'],
+      ['info', 'ℹ️'], ['information', 'ℹ️'], ['detail', '📋'],
+      ['important', '❗'], ['critical', '🚨'], ['urgent', '🔴'], ['priority', '🔝'],
+      ['start', '▶️'], ['begin', '🎬'], ['init', '🎬'], ['launch', '🚀'],
+      ['stop', '⏹️'], ['end', '🔚'], ['close', '🔒'], ['shutdown', '🔌'],
+      ['pause', '⏸️'], ['resume', '▶️'], ['continue', '➡️'],
+      ['save', '💾'], ['load', '📂'], ['open', '📂'], ['read', '📖'], ['write', '✍️'],
+      ['copy', '📋'], ['paste', '📋'], ['cut', '✂️'], ['move', '🚚'],
+      ['link', '🔗'], ['url', '🔗'], ['redirect', '↪️'], ['navigate', '🧭'],
+      ['share', '📤'], ['embed', '📎'], ['attach', '📎'], ['upload', '⬆️'], ['download', '⬇️'],
+      ['sync', '🔄'], ['refresh', '🔃'], ['reload', '🔄'], ['reset', '🔄'],
+      ['enable', '✅'], ['disable', '❌'], ['toggle', '🔀'], ['switch', '🔀'],
+      ['show', '👁️'], ['hide', '🙈'], ['visible', '👀'], ['invisible', '👻'],
+      ['expand', '➕'], ['collapse', '➖'], ['zoom', '🔍'], ['fullscreen', '⛶'],
+      ['lock', '🔒'], ['unlock', '🔓'], ['block', '🚫'], ['allow', '✅'],
+      ['approve', '✅'], ['reject', '❌'], ['accept', '✅'], ['decline', '❌'],
+      ['like', '👍'], ['dislike', '👎'], ['favorite', '⭐'], ['bookmark', '🔖'],
+      ['follow', '👣'], ['unfollow', '🚫'], ['subscribe', '🔔'], ['unsubscribe', '🔕'],
+      ['online', '🟢'], ['offline', '🔴'], ['away', '🟡'], ['busy', '🔴'],
+      ['connect', '🔗'], ['disconnect', '🔌'], ['network', '🌐'], ['internet', '🌍'],
+      ['local', '🏠'], ['remote', '🌐'], ['server', '🖥️'], ['client', '💻'],
+      ['input', '📥'], ['output', '📤'], ['result', '📊'], ['response', '💬'],
+      ['request', '📨'], ['send', '📤'], ['receive', '📥'], ['transfer', '🔄'],
+      ['time', '⏰'], ['date', '📅'], ['schedule', '📅'], ['calendar', '📆'],
+      ['morning', '🌅'], ['afternoon', '☀️'], ['evening', '🌆'], ['night', '🌙'],
+      ['today', '📅'], ['yesterday', '⏮️'], ['tomorrow', '⏭️'], ['week', '📅'],
+      ['month', '📅'], ['year', '📅'], ['hour', '🕐'], ['minute', '⏱️'],
+    ];
+
+    function getEmojiForContent(text) {
+      if (!text) return '💭';
+      const lower = text.toLowerCase();
+      for (const [keyword, emoji] of emojiKeywords) {
+        if (lower.includes(keyword)) return emoji;
+      }
+      return '💭';
+    }
 
     function escapeHtml(text) {
       const div = document.createElement('div');
