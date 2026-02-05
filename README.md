@@ -73,6 +73,7 @@ Run `/evermem:help` to check if the plugin is configured correctly.
 |---------|-------------|
 | `/evermem:help` | Show setup status and available commands |
 | `/evermem:search <query>` | Search your memories for specific topics |
+| `/evermem:ask <question>` | Ask about past work (combines memory + context) |
 | `/evermem:hub` | Open the Memory Hub dashboard |
 
 ### Automatic Behavior

@@ -21,6 +21,7 @@ import { formatRelativeTime } from './utils/mock-store.js';
 
 const MIN_WORDS = 3;
 const MAX_MEMORIES = 5;
+const MIN_SCORE = 0.1;  // Only show memories with relevance score above this threshold
 
 /**
  * Count words in a string
@@ -40,6 +41,11 @@ async function main() {
     const input = await readStdin();
     const data = JSON.parse(input);
     const prompt = data.prompt || '';
+
+    // Set cwd from hook input for config.getGroupId()
+    if (data.cwd) {
+      process.env.EVERMEM_CWD = data.cwd;
+    }
 
     // Skip short prompts silently
     if (countWords(prompt) < MIN_WORDS) {
@@ -66,24 +72,16 @@ async function main() {
       process.exit(0);
     }
 
-    // Debug: show what we got
-    const debugInfo = `[DEBUG] API returned ${JSON.stringify(apiResponse).length} bytes, transformed to ${memories.length} memories`;
-    if (memories.length === 0 && apiResponse) {
-      // Show raw response structure when no memories found
-      const keys = apiResponse.result ? Object.keys(apiResponse.result) : Object.keys(apiResponse);
-      const curlUsed = apiResponse._debug?.curl || 'N/A';
-      const reqBody = apiResponse._debug?.requestBody ? JSON.stringify(apiResponse._debug.requestBody) : 'N/A';
-      outputMessage(`🔍 EverMem: No relevant memories found\n${debugInfo}\nCurl: ${curlUsed}\nRequest body: ${reqBody}\nAPI keys: ${keys.join(', ')}\nRaw: ${JSON.stringify(apiResponse).substring(0, 300)}...`);
-      process.exit(0);
-    }
+    // Filter by minimum score threshold
+    const relevantMemories = memories.filter(m => m.score >= MIN_SCORE);
 
-    // No memories found (without debug - handled above with debug info)
-    if (memories.length === 0) {
+    // No relevant memories above threshold - silently exit (this is normal)
+    if (relevantMemories.length === 0) {
       process.exit(0);
     }
 
     // Take top memories
-    const selectedMemories = memories.slice(0, MAX_MEMORIES);
+    const selectedMemories = relevantMemories.slice(0, MAX_MEMORIES);
 
     // Build context for Claude
     const context = buildContext(selectedMemories);

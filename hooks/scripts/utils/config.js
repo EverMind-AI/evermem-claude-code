@@ -24,15 +24,15 @@ export function getUserId() {
 
 /**
  * Get the group ID for memory operations
- * Uses current working directory as default group
+ * Uses project working directory as default group
  * @returns {string} Group ID
  */
 export function getGroupId() {
   if (process.env.EVERMEM_GROUP_ID) {
     return process.env.EVERMEM_GROUP_ID;
   }
-  // Use cwd as group ID (sanitized)
-  const cwd = process.cwd();
+  // Use EVERMEM_CWD (set from hook input) or fall back to process.cwd()
+  const cwd = process.env.EVERMEM_CWD || process.cwd();
   return `claude-code:${cwd.replace(/[^a-zA-Z0-9-_/]/g, '_')}`;
 }
 
