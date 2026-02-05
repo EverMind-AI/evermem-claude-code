@@ -6,8 +6,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/session-context.js",
-            "timeout": 15
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/session-context-wrapper.sh",
+            "timeout": 30
           }
         ]
       }

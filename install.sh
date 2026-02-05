@@ -149,6 +149,15 @@ else
     exit 1
 fi
 
+# Install npm dependencies for hooks
+PLUGIN_CACHE="$HOME/.claude/plugins/cache/evermem/evermem"
+PLUGIN_DIR=$(ls -d "$PLUGIN_CACHE"/*/ 2>/dev/null | head -1)
+if [ -n "$PLUGIN_DIR" ] && [ -f "$PLUGIN_DIR/package.json" ]; then
+    echo "Installing dependencies..."
+    (cd "$PLUGIN_DIR" && npm install --silent 2>/dev/null)
+    echo -e "${GREEN}✓${NC} Dependencies installed"
+fi
+
 echo ""
 echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo -e "${GREEN}  🎉 Installation Complete!${NC}"
