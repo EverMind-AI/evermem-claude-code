@@ -135,29 +135,8 @@ claude plugin marketplace remove evermem 2>/dev/null || true
 if claude plugin marketplace add "$REPO_URL" 2>&1 | grep -q "Successfully"; then
     echo -e "${GREEN}✓${NC} Marketplace added"
 else
-    # Fallback: manually clone and register marketplace
-    echo "Using fallback installation method..."
-    MARKETPLACE_DIR="$HOME/.claude/plugins/marketplaces/evermem"
-    rm -rf "$MARKETPLACE_DIR"
-    if git clone "$REPO_URL.git" "$MARKETPLACE_DIR" 2>/dev/null; then
-        # Update known_marketplaces.json using node for reliable JSON handling
-        node -e "
-const fs = require('fs');
-const path = '$HOME/.claude/plugins/known_marketplaces.json';
-let data = {};
-try { data = JSON.parse(fs.readFileSync(path, 'utf8')); } catch {}
-data.evermem = {
-  source: { source: 'git', url: 'https://github.com/EverMind-AI/evermem-claude-code.git' },
-  installLocation: '$HOME/.claude/plugins/marketplaces/evermem',
-  lastUpdated: new Date().toISOString()
-};
-fs.writeFileSync(path, JSON.stringify(data, null, 2));
-" 2>/dev/null || true
-        echo -e "${GREEN}✓${NC} Marketplace added (fallback)"
-    else
-        echo -e "${RED}❌ Failed to add marketplace${NC}"
-        exit 1
-    fi
+    echo -e "${RED}❌ Failed to add marketplace${NC}"
+    exit 1
 fi
 
 # Install plugin
