@@ -144,7 +144,7 @@ function readStdin() {
  * @returns {string}
  */
 function buildDisplayMessage(memories) {
-  const header = `📝 Memory Recall by EverMem Plugin (${memories.length} memories):`;
+  const header = `📝 Memory Retrieved (${memories.length}):`;
 
   const lines = [header];
 

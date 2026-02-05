@@ -6,7 +6,7 @@ Persistent memory for Claude Code. Automatically saves and recalls context from 
 
 ## Features
 
-- **Automatic Memory Recall** - Relevant memories are retrieved when you submit a prompt
+- **Automatic Memory Retrieved** - Relevant memories are retrieved when you submit a prompt
 - **Automatic Memory Save** - Conversations are saved when Claude finishes responding
 - **Memory Search** - Manually search your memory history
 - **Memory Hub** - Visual dashboard to explore and manage memories
@@ -84,7 +84,7 @@ The plugin works automatically in the background:
 ```
 You: "How should I handle authentication?"
          ↓
-📝 Memory Recall by EverMem Plugin (2 memories):
+📝 Memory Retrieved (2):
   • [0.85] (2 days ago) Discussion about JWT token implementation
   • [0.72] (1 week ago) Auth middleware setup decisions
          ↓

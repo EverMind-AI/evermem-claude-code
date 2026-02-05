@@ -37,7 +37,7 @@ Present the configuration status to the user. If not configured, guide them thro
 | `/evermem:hub` | Open the Memory Hub dashboard to visualize and explore memories |
 
 **Automatic Features:**
-- **Memory Recall**: When you submit a prompt, relevant memories are automatically retrieved and shown
+- **Memory Retrieved**: When you submit a prompt, relevant memories are automatically retrieved and shown
 - **Memory Save**: When Claude finishes responding, the conversation is automatically saved to EverMem Cloud
 
 Share this information with the user in a clear, helpful format.

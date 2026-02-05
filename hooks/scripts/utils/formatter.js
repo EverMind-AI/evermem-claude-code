@@ -82,7 +82,7 @@ export function formatSummaryBox(result, rawCount, filteredCount) {
   const divider = useUnicode ? '\u2500'.repeat(50) : '-'.repeat(50);
 
   let output = '\n';
-  output += useUnicode ? '\u{1F4AD} Memory Recall\n' : '=== Memory Recall ===\n';
+  output += useUnicode ? '\u{1F4AD} Memory Retrieved\n' : '=== Memory Retrieved ===\n';
   output += divider + '\n';
 
   // Individual memories with original text and timestamp
@@ -108,7 +108,7 @@ export function formatNoMemories() {
   const useUnicode = supportsUnicode();
   const icon = useUnicode ? '\u{1F4AD}' : '===';
 
-  return `\n${icon} Memory Recall: No relevant memories found\n`;
+  return `\n${icon} Memory Retrieved: No relevant memories found\n`;
 }
 
 /**
@@ -120,7 +120,7 @@ export function formatError(message) {
   const useUnicode = supportsUnicode();
   const icon = useUnicode ? '\u26A0\u{FE0F}' : '[!]';
 
-  return `\n${icon} Memory Recall: ${message}\n   Continuing without memory context\n`;
+  return `\n${icon} Memory Retrieved: ${message}\n   Continuing without memory context\n`;
 }
 
 /**
@@ -134,7 +134,7 @@ export function formatFallbackSummary(memories, rawCount) {
   const divider = useUnicode ? '\u2500'.repeat(50) : '-'.repeat(50);
 
   let output = '\n';
-  output += useUnicode ? '\u{1F4AD} Memory Recall (Fallback)\n' : '=== Memory Recall (Fallback) ===\n';
+  output += useUnicode ? '\u{1F4AD} Memory Retrieved (Fallback)\n' : '=== Memory Retrieved (Fallback) ===\n';
   output += divider + '\n';
 
   for (let i = 0; i < memories.length; i++) {

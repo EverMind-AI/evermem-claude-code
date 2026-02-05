@@ -47,12 +47,12 @@ async function summarizeContext(memories) {
 
   const systemPrompt = `You are a concise context summarizer. Generate a brief summary of what tasks the user is currently working on based on their recent session memories.`;
 
-  const userPrompt = `Based on these recent session memories, write a 2-3 sentence summary of what the user is currently working on. Focus on the main task/project and any immediate goals.
+  const userPrompt = `Based on these recent session memories, write a 1-2 sentence summary of the user's recent work. Focus on the main task/project.
 
 RECENT MEMORIES:
 ${memoriesText}
 
-Write a brief summary starting with "Currently working on:" - be concise and specific.`;
+Be concise and specific. Do not start with "Currently working on" or similar preamble.`;
 
   const abortController = new AbortController();
   const timeoutId = setTimeout(() => abortController.abort(), SUMMARIZE_TIMEOUT_MS);
@@ -159,8 +159,8 @@ ${recentMemories.map((m, i) => {
     }
 
     const displayOutput = summary
-      ? `📋 EverMem: ${summary}`
-      : `📋 EverMem Session Context (${recentMemories.length} memories loaded)`;
+      ? `💡 EverMem Reminder: ${summary}`
+      : `💡 EverMem Reminder: ${recentMemories.length} recent memories loaded`;
 
     // Output: display to user and add to context
     console.log(JSON.stringify({
