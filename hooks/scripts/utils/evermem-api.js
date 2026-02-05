@@ -118,12 +118,10 @@ export function transformSearchResults(apiResponse) {
   const memories = [];
   const result = apiResponse.result;
   const memoryList = result.memories || [];
-  const scores = result.scores || [];
 
-  // API returns: memories[].episode for content, memories[].subject for title
+  // API returns: memories[].episode for content, memories[].subject for title, memories[].score for relevance
   for (let i = 0; i < memoryList.length; i++) {
     const mem = memoryList[i];
-    const score = scores[i] || 0;
 
     // Use episode as the content
     const content = mem.episode || '';
@@ -134,7 +132,7 @@ export function transformSearchResults(apiResponse) {
       subject: mem.subject || '',  // Title for display
       timestamp: mem.timestamp || new Date().toISOString(),
       memoryType: mem.memory_type,  // Keep raw type if needed
-      score: score,
+      score: mem.score || 0,  // Score is now inside each memory object
       metadata: {
         groupId: mem.group_id,
         type: mem.type,
@@ -217,4 +215,79 @@ export async function addMemory(message) {
  */
 function generateMessageId() {
   return `cc_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+}
+
+/**
+ * Get memories from EverMem Cloud (ordered by time, old to new)
+ * @param {Object} options - Options
+ * @param {number} options.limit - Max results (default: 100)
+ * @param {string} options.memoryType - Memory type filter (default: 'episodic_memory')
+ * @returns {Promise<Object>} API response with memories
+ */
+export async function getMemories(options = {}) {
+  const config = getConfig();
+
+  if (!config.isConfigured) {
+    throw new Error('EverMem API key not configured');
+  }
+
+  const {
+    limit = 100,
+    memoryType = 'episodic_memory'
+  } = options;
+
+  // Build query params
+  const params = new URLSearchParams({
+    user_id: config.userId,
+    memory_type: memoryType,
+    limit: limit.toString()
+  });
+
+  if (config.groupId) {
+    params.append('group_id', config.groupId);
+  }
+
+  const url = `${config.apiBaseUrl}/api/v1/memories?${params}`;
+
+  try {
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${config.apiKey}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`API error ${response.status}: ${errorText}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    throw error;
+  }
+}
+
+/**
+ * Transform getMemories response to simple format
+ * @param {Object} apiResponse - Raw API response
+ * @returns {Object[]} Formatted memories (newest first, sorted by timestamp)
+ */
+export function transformGetMemoriesResults(apiResponse) {
+  if (!apiResponse?.result?.memories) {
+    return [];
+  }
+
+  const memories = apiResponse.result.memories.map(mem => ({
+    text: mem.episode || '',
+    subject: mem.subject || '',
+    timestamp: mem.timestamp || mem.create_time || new Date().toISOString(),
+    groupId: mem.group_id
+  })).filter(m => m.text);
+
+  // Sort by timestamp descending (newest first)
+  memories.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+  return memories;
 }

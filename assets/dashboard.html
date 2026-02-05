@@ -457,6 +457,57 @@
       line-height: 1.7;
       white-space: pre-wrap;
     }
+
+    /* Conversation display in modal */
+    .conversation-container {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .conversation-message {
+      padding: 12px 16px;
+      border-radius: 8px;
+      background: #0d1117;
+      border: 1px solid #30363d;
+    }
+    .conversation-message.user {
+      border-left: 3px solid #58a6ff;
+    }
+    .conversation-message.assistant {
+      border-left: 3px solid #3fb950;
+    }
+    .conversation-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+      font-size: 12px;
+    }
+    .conversation-speaker {
+      font-weight: 600;
+      color: #f0f6fc;
+    }
+    .conversation-speaker.user { color: #58a6ff; }
+    .conversation-speaker.assistant { color: #3fb950; }
+    .conversation-time {
+      color: #8b949e;
+    }
+    .conversation-text {
+      font-size: 13px;
+      color: #c9d1d9;
+      line-height: 1.6;
+      white-space: pre-wrap;
+    }
+    .modal-section-title {
+      font-size: 12px;
+      font-weight: 600;
+      color: #8b949e;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #30363d;
+    }
   </style>
 </head>
 <body>
@@ -701,7 +752,8 @@
           date: formatLocalDate(date),
           time: date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
           score: scores[i] || 0,
-          memoryType: mem.memory_type
+          memoryType: mem.memory_type,
+          summary: mem.summary || ''
         };
       }).filter(m => m.content);
     }
@@ -1089,6 +1141,7 @@
       document.getElementById('modal-title').textContent = memory.subject || 'Memory';
       document.getElementById('modal-meta').innerHTML = `${dateStr}${projectName ? ` · <span style="font-family: monospace;">${escapeHtml(projectName)}</span>` : ''}`;
       document.getElementById('modal-content').textContent = memory.content;
+
       document.getElementById('modal-overlay').classList.add('visible');
       document.body.style.overflow = 'hidden';
     }

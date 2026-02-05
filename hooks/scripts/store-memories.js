@@ -23,6 +23,11 @@ try {
   const hookInput = JSON.parse(input);
   const transcriptPath = hookInput.transcript_path;
 
+  // Set cwd from hook input for config.getGroupId()
+  if (hookInput.cwd) {
+    process.env.EVERMEM_CWD = hookInput.cwd;
+  }
+
   if (!transcriptPath || !existsSync(transcriptPath) || !isConfigured()) {
     process.exit(0);
   }

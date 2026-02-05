@@ -2,57 +2,55 @@
 
 /**
  * EverMem MCP Server
- * Exposes memory search and retrieval tools for Claude to use autonomously
+ * Exposes memory search tool for Claude to find relevant context from past sessions
  */
 
 import { createInterface } from 'readline';
 import { searchMemories, transformSearchResults } from '../hooks/scripts/utils/evermem-api.js';
 import { getConfig } from '../hooks/scripts/utils/config.js';
 
-// Tool definitions
+// Tool definitions - following claude-mem's concise pattern
 const TOOLS = [
   {
-    name: 'search_memories',
-    description: 'Search past conversation memories using semantic and keyword matching. Use this to find relevant context from previous sessions.',
+    name: 'evermem_search',
+    description: 'Search past conversation memories. Returns summaries with dates and relevance scores. Use when user asks about previous work, decisions, or context from past sessions. Params: query (required), limit (default: 10, max: 20)',
     inputSchema: {
       type: 'object',
       properties: {
         query: {
           type: 'string',
-          description: 'The search query to find relevant memories'
+          description: 'Search query - use keywords, topics, or questions'
         },
         limit: {
           type: 'number',
-          description: 'Maximum number of memories to return (default: 10, max: 20)',
-          default: 10
+          description: 'Max results to return (default: 10, max: 20)'
         }
       },
       required: ['query']
     }
-  },
-  {
-    name: 'get_memory',
-    description: 'Get the full details of a specific memory by its ID',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        memory_id: {
-          type: 'string',
-          description: 'The unique identifier of the memory to retrieve'
-        }
-      },
-      required: ['memory_id']
-    }
   }
 ];
 
-// In-memory cache for recent search results (to support get_memory)
-const memoryCache = new Map();
+/**
+ * Format date as relative time (e.g., "2 days ago", "today")
+ */
+function formatRelativeDate(timestamp) {
+  const date = new Date(timestamp);
+  const now = new Date();
+  const diffMs = now - date;
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+  if (diffDays === 0) return 'today';
+  if (diffDays === 1) return 'yesterday';
+  if (diffDays < 7) return `${diffDays} days ago`;
+  if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
+  return date.toLocaleDateString();
+}
 
 /**
- * Handle search_memories tool call
+ * Handle evermem_search tool call
  */
-async function handleSearchMemories(args) {
+async function handleSearch(args) {
   const config = getConfig();
 
   if (!config.isConfigured) {
@@ -63,6 +61,13 @@ async function handleSearchMemories(args) {
   }
 
   const query = args.query;
+  if (!query) {
+    return {
+      isError: true,
+      content: [{ type: 'text', text: 'Missing required parameter: query' }]
+    };
+  }
+
   const limit = Math.min(args.limit || 10, 20);
 
   try {
@@ -71,68 +76,36 @@ async function handleSearchMemories(args) {
 
     if (memories.length === 0) {
       return {
-        content: [{ type: 'text', text: 'No memories found matching your query.' }]
+        content: [{ type: 'text', text: `No memories found for: "${query}"` }]
       };
     }
 
-    // Cache memories for get_memory lookups
-    memories.forEach((memory, index) => {
-      const memoryId = `mem_${Date.now()}_${index}`;
-      memory.id = memoryId;
-      memoryCache.set(memoryId, memory);
+    // Format as compact table (token-efficient like claude-mem)
+    const header = '| # | Score | Date | Summary |';
+    const separator = '|---|-------|------|---------|';
+
+    const rows = memories.map((mem, i) => {
+      const score = Math.round(mem.score * 100);
+      const date = formatRelativeDate(mem.timestamp);
+      // Use full subject field
+      const summary = (mem.subject || mem.text.substring(0, 150)).replace(/\|/g, '/').replace(/\n/g, ' ');
+      return `| ${i + 1} | ${score}% | ${date} | ${summary} |`;
     });
 
-    // Keep cache size reasonable
-    if (memoryCache.size > 100) {
-      const keys = Array.from(memoryCache.keys());
-      keys.slice(0, 50).forEach(key => memoryCache.delete(key));
-    }
+    const table = [header, separator, ...rows].join('\n');
 
-    // Format results
-    const results = memories.map((mem, i) => {
-      const date = new Date(mem.timestamp).toLocaleDateString();
-      const score = Math.round(mem.score * 100);
-      const preview = mem.text.length > 200 ? mem.text.substring(0, 200) + '...' : mem.text;
-      return `[${i + 1}] ID: ${mem.id}\n    Type: ${mem.type} | Score: ${score}% | Date: ${date}\n    ${preview}`;
-    }).join('\n\n');
+    // Add context about what was found
+    const resultText = `Found ${memories.length} memories for "${query}":\n\n${table}\n\nTo get full content of a specific memory, ask me to elaborate on that topic.`;
 
     return {
-      content: [{
-        type: 'text',
-        text: `Found ${memories.length} memories:\n\n${results}\n\nUse get_memory with an ID to see full content.`
-      }]
+      content: [{ type: 'text', text: resultText }]
     };
   } catch (error) {
     return {
       isError: true,
-      content: [{ type: 'text', text: `Error searching memories: ${error.message}` }]
+      content: [{ type: 'text', text: `Search error: ${error.message}` }]
     };
   }
-}
-
-/**
- * Handle get_memory tool call
- */
-async function handleGetMemory(args) {
-  const memoryId = args.memory_id;
-
-  const memory = memoryCache.get(memoryId);
-
-  if (!memory) {
-    return {
-      isError: true,
-      content: [{ type: 'text', text: `Memory not found: ${memoryId}. Try searching first with search_memories.` }]
-    };
-  }
-
-  const date = new Date(memory.timestamp).toLocaleString();
-
-  return {
-    content: [{
-      type: 'text',
-      text: `Memory: ${memoryId}\nType: ${memory.type}\nDate: ${date}\nScore: ${Math.round(memory.score * 100)}%\n\n--- Content ---\n${memory.text}`
-    }]
-  };
 }
 
 /**
@@ -159,7 +132,6 @@ async function handleRequest(request) {
       };
 
     case 'notifications/initialized':
-      // No response needed for notifications
       return null;
 
     case 'tools/list':
@@ -176,11 +148,8 @@ async function handleRequest(request) {
       let result;
 
       switch (name) {
-        case 'search_memories':
-          result = await handleSearchMemories(args || {});
-          break;
-        case 'get_memory':
-          result = await handleGetMemory(args || {});
+        case 'evermem_search':
+          result = await handleSearch(args || {});
           break;
         default:
           return {
