@@ -52,9 +52,8 @@ async function main() {
       process.exit(0);
     }
 
-    // Skip if not configured
+    // Skip if not configured (silent - don't nag users)
     if (!isConfigured()) {
-      outputMessage('⚠️ EverMem: API key not configured. Set EVERMEM_API_KEY environment variable.');
       process.exit(0);
     }
 
@@ -68,7 +67,7 @@ async function main() {
       });
       memories = transformSearchResults(apiResponse);
     } catch (error) {
-      outputMessage(`❌ EverMem: API error - ${error.message}`);
+      // Silent on API errors - don't block user workflow
       process.exit(0);
     }
 
@@ -89,7 +88,7 @@ async function main() {
     // Build display message for user
     const displayMessage = buildDisplayMessage(selectedMemories);
 
-    // Output JSON with systemMessage (displays to user) and additionalContext (for Claude)
+    // Output JSON with systemMessage (user display) and additionalContext (for Claude)
     const output = {
       systemMessage: displayMessage,
       hookSpecificOutput: {
@@ -102,18 +101,9 @@ async function main() {
     process.exit(0);
 
   } catch (error) {
-    outputMessage(`❌ EverMem: Hook error - ${error.message}`);
+    // Silent on errors - don't block user workflow
     process.exit(0);
   }
-}
-
-/**
- * Output a system message to the user
- * @param {string} message - Message to display
- */
-function outputMessage(message) {
-  const output = { systemMessage: message };
-  process.stdout.write(JSON.stringify(output));
 }
 
 /**

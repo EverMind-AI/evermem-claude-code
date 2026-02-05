@@ -1,14 +1,7 @@
 #!/usr/bin/env node
 
-process.on('uncaughtException', (err) => {
-  process.stdout.write(JSON.stringify({ systemMessage: `💾 UNCAUGHT: ${err.message}` }));
-  process.exit(1);
-});
-
-process.on('unhandledRejection', (reason) => {
-  process.stdout.write(JSON.stringify({ systemMessage: `💾 UNHANDLED: ${reason}` }));
-  process.exit(1);
-});
+process.on('uncaughtException', () => process.exit(0));
+process.on('unhandledRejection', () => process.exit(0));
 
 import { readFileSync, existsSync } from 'fs';
 import { isConfigured } from './utils/config.js';
@@ -78,11 +71,12 @@ try {
   // Check if all calls succeeded
   const allSuccess = results.length > 0 && results.every(r => r.ok && !r.error);
 
-  let output;
   if (allSuccess) {
-    output = `💾 EverMem: Memory saved (${results.length} messages)`;
+    // Success: minimal systemMessage
+    process.stdout.write(JSON.stringify({ systemMessage: `💾 Memory saved (${results.length})` }));
+    process.exit(0);
   } else {
-    // Show detailed errors
+    // Failure: show detailed errors via systemMessage
     function truncateBody(body) {
       if (!body) return body;
       const copy = { ...body };
@@ -92,7 +86,7 @@ try {
       return copy;
     }
 
-    output = '💾 EverMem: Save failed\n';
+    let output = '💾 EverMem: Save failed\n';
     for (const r of results) {
       if (r.error) {
         output += `${r.type}: ERROR - ${r.error}\n`;
@@ -102,10 +96,10 @@ try {
         output += `Response: ${JSON.stringify(r.response, null, 2)}\n`;
       }
     }
+    process.stdout.write(JSON.stringify({ systemMessage: output }));
   }
 
-  process.stdout.write(JSON.stringify({ systemMessage: output }));
-
 } catch (e) {
-  process.stdout.write(JSON.stringify({ systemMessage: `💾 ERROR: ${e.message}` }));
+  // Silent on errors
+  process.exit(0);
 }
