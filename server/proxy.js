@@ -41,8 +41,8 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // Handle POST /api/v1/memories (list) - forwards as GET with body
-  if (req.method === 'POST' && req.url === '/api/v1/memories') {
+  // Handle POST /api/v0/memories (list) - forwards as GET with body
+  if (req.method === 'POST' && req.url === '/api/v0/memories') {
     let body = '';
 
     req.on('data', chunk => { body += chunk; });
@@ -57,7 +57,7 @@ const server = http.createServer((req, res) => {
       try {
         // Forward as GET with body using curl
         const jsonBody = body.replace(/'/g, "'\\''");
-        const curlCmd = `curl -s -X GET "${API_BASE}/api/v1/memories" -H "Authorization: ${authHeader}" -H "Content-Type: application/json" -d '${jsonBody}'`;
+        const curlCmd = `curl -s -X GET "${API_BASE}/api/v0/memories" -H "Authorization: ${authHeader}" -H "Content-Type: application/json" -d '${jsonBody}'`;
 
         const result = execSync(curlCmd, { timeout: 30000, encoding: 'utf8' });
         const data = JSON.parse(result);
@@ -75,8 +75,8 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // Handle POST /api/v1/memories/search - forwards as GET with body
-  if (req.method === 'POST' && req.url === '/api/v1/memories/search') {
+  // Handle POST /api/v0/memories/search - forwards as GET with body
+  if (req.method === 'POST' && req.url === '/api/v0/memories/search') {
     let body = '';
 
     req.on('data', chunk => { body += chunk; });
@@ -91,7 +91,7 @@ const server = http.createServer((req, res) => {
       try {
         // Forward as GET with body using curl
         const jsonBody = body.replace(/'/g, "'\\''");
-        const curlCmd = `curl -s -X GET "${API_BASE}/api/v1/memories/search" -H "Authorization: ${authHeader}" -H "Content-Type: application/json" -d '${jsonBody}'`;
+        const curlCmd = `curl -s -X GET "${API_BASE}/api/v0/memories/search" -H "Authorization: ${authHeader}" -H "Content-Type: application/json" -d '${jsonBody}'`;
 
         const result = execSync(curlCmd, { timeout: 30000, encoding: 'utf8' });
         const data = JSON.parse(result);

@@ -205,10 +205,10 @@
       position: relative;
     }
     .heatmap-cell:hover { transform: scale(1.3); z-index: 10; }
-    .heatmap-cell.level-1 { background: #0e4429; border-color: #0e4429; }
-    .heatmap-cell.level-2 { background: #006d32; border-color: #006d32; }
-    .heatmap-cell.level-3 { background: #26a641; border-color: #26a641; }
-    .heatmap-cell.level-4 { background: #39d353; border-color: #39d353; }
+    .heatmap-cell.level-1 { background: #4d3a10; border-color: #4d3a10; }
+    .heatmap-cell.level-2 { background: #806200; border-color: #806200; }
+    .heatmap-cell.level-3 { background: #cc9a00; border-color: #cc9a00; }
+    .heatmap-cell.level-4 { background: #FFC53D; border-color: #FFC53D; }
     .heatmap-tooltip {
       position: fixed;
       background: #1c2128;
@@ -665,7 +665,7 @@
       `;
 
       try {
-        const response = await fetch(`${PROXY_URL}/api/v1/memories`, {
+        const response = await fetch(`${PROXY_URL}/api/v0/memories`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${apiKey}`,
@@ -838,10 +838,10 @@
             <div class="heatmap-legend">
               <span>Less</span>
               <div class="heatmap-legend-cell" style="background: #161b22; border: 1px solid #21262d;"></div>
-              <div class="heatmap-legend-cell" style="background: #0e4429;"></div>
-              <div class="heatmap-legend-cell" style="background: #006d32;"></div>
-              <div class="heatmap-legend-cell" style="background: #26a641;"></div>
-              <div class="heatmap-legend-cell" style="background: #39d353;"></div>
+              <div class="heatmap-legend-cell" style="background: #4d3a10;"></div>
+              <div class="heatmap-legend-cell" style="background: #806200;"></div>
+              <div class="heatmap-legend-cell" style="background: #cc9a00;"></div>
+              <div class="heatmap-legend-cell" style="background: #FFC53D;"></div>
               <span>More</span>
             </div>
           </div>
@@ -973,6 +973,12 @@
         monthsContainer.appendChild(span);
       });
 
+      // Calculate dynamic thresholds based on max count (quartiles)
+      const maxCount = Math.max(...Object.values(memoriesByDate), 1);
+      const q1 = Math.max(1, Math.ceil(maxCount * 0.25));
+      const q2 = Math.max(2, Math.ceil(maxCount * 0.5));
+      const q3 = Math.max(3, Math.ceil(maxCount * 0.75));
+
       // Render weeks (columns)
       heatmapContainer.innerHTML = '';
       weeks.forEach((week, weekIndex) => {
@@ -995,9 +1001,9 @@
           cell.dataset.date = day.date;
           cell.dataset.count = day.count;
 
-          if (day.count >= 4) cell.classList.add('level-4');
-          else if (day.count >= 3) cell.classList.add('level-3');
-          else if (day.count >= 2) cell.classList.add('level-2');
+          if (day.count >= q3) cell.classList.add('level-4');
+          else if (day.count >= q2) cell.classList.add('level-3');
+          else if (day.count >= q1) cell.classList.add('level-2');
           else if (day.count >= 1) cell.classList.add('level-1');
 
           cell.addEventListener('mouseenter', showHeatmapTooltip);

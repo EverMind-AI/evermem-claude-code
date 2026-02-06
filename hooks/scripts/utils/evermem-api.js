@@ -69,7 +69,7 @@ export async function searchMemories(query, options = {}) {
     // Use curl since Node.js fetch doesn't support GET with body
     // Escape single quotes in JSON for shell safety: ' -> '\''
     const jsonBody = JSON.stringify(requestBody).replace(/'/g, "'\\''");
-    const curlCmd = `curl -s -X GET "${config.apiBaseUrl}/api/v1/memories/search" -H "Authorization: Bearer ${config.apiKey}" -H "Content-Type: application/json" -d '${jsonBody}'`;
+    const curlCmd = `curl -s -X GET "${config.apiBaseUrl}/api/v0/memories/search" -H "Authorization: Bearer ${config.apiKey}" -H "Content-Type: application/json" -d '${jsonBody}'`;
 
     // Return debug info along with result
     let result, data;
@@ -163,7 +163,7 @@ export async function addMemory(message) {
     throw new Error('EverMem API key not configured');
   }
 
-  const url = `${config.apiBaseUrl}/api/v1/memories`;
+  const url = `${config.apiBaseUrl}/api/v0/memories`;
   const requestBody = {
     message_id: message.messageId || generateMessageId(),
     create_time: new Date().toISOString(),
@@ -247,7 +247,7 @@ export async function getMemories(options = {}) {
     params.append('group_id', config.groupId);
   }
 
-  const url = `${config.apiBaseUrl}/api/v1/memories?${params}`;
+  const url = `${config.apiBaseUrl}/api/v0/memories?${params}`;
 
   try {
     const response = await fetch(url, {
