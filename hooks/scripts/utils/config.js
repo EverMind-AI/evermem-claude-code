@@ -1,7 +1,30 @@
 /**
  * Configuration loader for EverMem plugin
- * Reads settings from environment variables
+ * Reads settings from .env file and environment variables
  */
+
+import { readFileSync, existsSync } from 'fs';
+import { resolve, dirname } from 'path';
+import { fileURLToPath } from 'url';
+
+// Load .env file from plugin root
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const envPath = resolve(__dirname, '../../../.env');
+
+if (existsSync(envPath)) {
+  const envContent = readFileSync(envPath, 'utf8');
+  for (const line of envContent.split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    const [key, ...valueParts] = trimmed.split('=');
+    if (key && valueParts.length > 0) {
+      const value = valueParts.join('=').replace(/^["']|["']$/g, '');
+      if (!process.env[key]) {  // Don't override existing env vars
+        process.env[key] = value;
+      }
+    }
+  }
+}
 
 const API_BASE_URL = 'https://api.evermind.ai';
 
