@@ -43,11 +43,29 @@ export function searchMemories(query, memories) {
 }
 
 /**
- * Count words in a string
+ * Count words/tokens in a string (multilingual support)
+ * - For CJK (Chinese/Japanese/Korean): counts each character as a token
+ * - For other languages: counts space-separated words
+ * - For mixed text: counts both
  * @param {string} text - Input text
- * @returns {number} Word count
+ * @returns {number} Word/token count
  */
 export function countWords(text) {
   if (!text) return 0;
-  return text.trim().split(/\s+/).filter(w => w.length > 0).length;
+  const trimmed = text.trim();
+  if (!trimmed) return 0;
+
+  // Regex for CJK characters (Chinese, Japanese Kanji, Korean Hanja)
+  // Also includes Japanese Hiragana/Katakana and Korean Hangul
+  const cjkRegex = /[\u4E00-\u9FFF\u3400-\u4DBF\u3040-\u309F\u30A0-\u30FF\uAC00-\uD7AF]/g;
+
+  // Count CJK characters
+  const cjkMatches = trimmed.match(cjkRegex);
+  const cjkCount = cjkMatches ? cjkMatches.length : 0;
+
+  // Remove CJK characters and count remaining space-separated words
+  const nonCjkText = trimmed.replace(cjkRegex, ' ').trim();
+  const wordCount = nonCjkText ? nonCjkText.split(/\s+/).filter(w => w.length > 0).length : 0;
+
+  return cjkCount + wordCount;
 }
