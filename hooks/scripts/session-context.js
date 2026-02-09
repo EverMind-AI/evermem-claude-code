@@ -5,8 +5,28 @@
  * Retrieves recent memories and uses Claude Code SDK to generate a context summary
  */
 
+// Check Node.js version early
+const nodeVersion = process.versions?.node;
+if (!nodeVersion) {
+  console.error(JSON.stringify({
+    continue: true,
+    systemMessage: '⚠️ EverMem: Node.js environment not detected. Please install Node.js 18+ to use EverMem.'
+  }));
+  process.exit(0);
+}
+
+const [major] = nodeVersion.split('.').map(Number);
+if (major < 18) {
+  console.error(JSON.stringify({
+    continue: true,
+    systemMessage: `⚠️ EverMem: Node.js ${nodeVersion} is too old. Please upgrade to Node.js 18+.`
+  }));
+  process.exit(0);
+}
+
 import { getMemories, transformGetMemoriesResults } from './utils/evermem-api.js';
-import { getConfig } from './utils/config.js';
+import { getConfig, getGroupId } from './utils/config.js';
+import { saveGroup } from './utils/groups-store.js';
 import { query } from '@anthropic-ai/claude-agent-sdk';
 import { execSync } from 'child_process';
 
@@ -101,7 +121,13 @@ async function main() {
     if (input) {
       hookInput = JSON.parse(input);
     }
-  } catch {}
+  } catch (parseError) {
+    console.log(JSON.stringify({
+      continue: true,
+      systemMessage: `⚠️ EverMem: Failed to parse hook input - ${parseError.message}`
+    }));
+    return;
+  }
 
   // Set cwd from hook input for config.getGroupId()
   if (hookInput.cwd) {
@@ -109,6 +135,16 @@ async function main() {
   }
 
   const config = getConfig();
+
+  // Save group to local storage (track which projects use EverMem)
+  if (hookInput.cwd) {
+    try {
+      saveGroup(getGroupId(), hookInput.cwd);
+    } catch (groupError) {
+      // Non-blocking, but log for debugging
+      console.error(`EverMem groups-store error: ${groupError.message}`);
+    }
+  }
 
   if (!config.isConfigured) {
     // Silently skip if not configured
@@ -170,10 +206,54 @@ ${recentMemories.map((m, i) => {
     }));
 
   } catch (error) {
-    // Don't block session start on errors
-    console.error(`EverMem context error: ${error.message}`);
-    console.log(JSON.stringify({ continue: true }));
+    // Don't block session start on errors, but provide detailed error info
+    const errorDetails = {
+      message: error.message,
+      code: error.code,
+      name: error.name
+    };
+
+    // Provide user-friendly error messages
+    let userMessage = '⚠️ EverMem: ';
+    if (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED') {
+      userMessage += `Network error - cannot reach EverMem server. Check your internet connection.`;
+    } else if (error.code === 'ETIMEDOUT') {
+      userMessage += `Request timeout - EverMem server is slow or unreachable.`;
+    } else if (error.message?.includes('401') || error.message?.includes('Unauthorized')) {
+      userMessage += `Authentication failed. Check your EVERMEM_API_KEY in .env file.`;
+    } else if (error.message?.includes('404')) {
+      userMessage += `API endpoint not found. Check EVERMEM_BASE_URL in .env file.`;
+    } else if (error.message?.includes('ENOENT')) {
+      userMessage += `File not found: ${error.path || 'unknown'}`;
+    } else {
+      userMessage += `${error.name}: ${error.message}`;
+    }
+
+    console.log(JSON.stringify({
+      continue: true,
+      systemMessage: userMessage
+    }));
   }
 }
+
+// Top-level error handler for uncaught exceptions during module load
+process.on('uncaughtException', (error) => {
+  let userMessage = '⚠️ EverMem SessionStart failed: ';
+
+  if (error.code === 'ERR_MODULE_NOT_FOUND') {
+    const moduleName = error.message.match(/Cannot find package '([^']+)'/)?.[1] || 'unknown';
+    userMessage += `Missing dependency '${moduleName}'. Run: cd ${process.cwd()} && npm install`;
+  } else if (error.code === 'ERR_REQUIRE_ESM') {
+    userMessage += `Module format error. Ensure package.json has "type": "module"`;
+  } else {
+    userMessage += `${error.name}: ${error.message}`;
+  }
+
+  console.log(JSON.stringify({
+    continue: true,
+    systemMessage: userMessage
+  }));
+  process.exit(0);
+});
 
 main();

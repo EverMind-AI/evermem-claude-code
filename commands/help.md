@@ -35,6 +35,8 @@ Present the configuration status to the user. If not configured, guide them thro
 | `/evermem:help` | Show this help message |
 | `/evermem:search <query>` | Search your memories for specific topics |
 | `/evermem:hub` | Open the Memory Hub dashboard to visualize and explore memories |
+| `/evermem:debug` | View debug logs for troubleshooting |
+| `/evermem:groups` | View tracked projects/memory groups |
 
 **Automatic Features:**
 - **Memory Retrieved**: When you submit a prompt, relevant memories are automatically retrieved and shown

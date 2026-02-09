@@ -113,18 +113,14 @@ try {
     // So current turn END is always at the end of the file.
     const turnEndIndex = lines.length;
 
-    // Current turn START is right after the last turn_duration or file-history-snapshot marker.
+    // Current turn START is right after the last turn_duration marker.
+    // Only turn_duration marks turn boundaries (file-history-snapshot is NOT a turn boundary).
     // If no marker found, start from beginning of file.
     let turnStartIndex = 0;
     for (let i = lines.length - 1; i >= 0; i--) {
       try {
         const e = JSON.parse(lines[i]);
         if (e.type === 'system' && e.subtype === 'turn_duration') {
-          turnStartIndex = i + 1;
-          break;
-        }
-        // Also stop at file-history-snapshot (session marker)
-        if (e.type === 'file-history-snapshot') {
           turnStartIndex = i + 1;
           break;
         }

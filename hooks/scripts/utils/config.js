@@ -6,6 +6,7 @@
 import { readFileSync, existsSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { createHash } from 'crypto';
 
 // Load .env file from plugin root
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -73,6 +74,20 @@ export function getApiBaseUrl() {
  */
 export function isConfigured() {
   return !!getApiKey();
+}
+
+/**
+ * Get a hashed identifier for the API key (for local storage association)
+ * Uses SHA-256 hash, truncated to 12 characters for compactness
+ * @returns {string|null} Key ID (first 12 chars of SHA-256 hash) or null if no API key
+ */
+export function getKeyId() {
+  const apiKey = getApiKey();
+  if (!apiKey) {
+    return null;
+  }
+  const hash = createHash('sha256').update(apiKey).digest('hex');
+  return hash.substring(0, 12);
 }
 
 /**

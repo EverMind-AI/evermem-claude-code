@@ -11,14 +11,77 @@
 
 import http from 'http';
 import { execSync } from 'child_process';
-import { readFileSync } from 'fs';
+import { readFileSync, existsSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
+import { createHash } from 'crypto';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const PORT = process.env.EVERMEM_PROXY_PORT || 3456;
 const API_BASE = 'https://api.evermind.ai';
+const GROUPS_FILE = join(__dirname, '..', 'data', 'groups.jsonl');
+
+/**
+ * Compute keyId from API key (SHA-256 hash, first 12 chars)
+ */
+function computeKeyId(apiKey) {
+  if (!apiKey) return null;
+  const hash = createHash('sha256').update(apiKey).digest('hex');
+  return hash.substring(0, 12);
+}
+
+/**
+ * Read groups from JSONL file and filter by keyId
+ */
+function getGroupsForKey(keyId) {
+  if (!existsSync(GROUPS_FILE)) {
+    return [];
+  }
+
+  try {
+    const content = readFileSync(GROUPS_FILE, 'utf8');
+    const lines = content.trim().split('\n').filter(Boolean);
+
+    // Aggregate by groupId for matching keyId
+    const groupMap = new Map();
+
+    for (const line of lines) {
+      try {
+        const entry = JSON.parse(line);
+        // Only include entries matching this keyId
+        if (entry.keyId !== keyId) continue;
+
+        const existing = groupMap.get(entry.groupId);
+        if (existing) {
+          existing.sessionCount += 1;
+          if (entry.timestamp > existing.lastSeen) {
+            existing.lastSeen = entry.timestamp;
+          }
+          if (entry.timestamp < existing.firstSeen) {
+            existing.firstSeen = entry.timestamp;
+          }
+        } else {
+          groupMap.set(entry.groupId, {
+            id: entry.groupId,
+            name: entry.name,
+            path: entry.path,
+            firstSeen: entry.timestamp,
+            lastSeen: entry.timestamp,
+            sessionCount: 1
+          });
+        }
+      } catch {}
+    }
+
+    // Sort by lastSeen (most recent first)
+    return Array.from(groupMap.values()).sort((a, b) =>
+      new Date(b.lastSeen).getTime() - new Date(a.lastSeen).getTime()
+    );
+  } catch {
+    return [];
+  }
+}
 
 function sendCorsHeaders(res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -112,6 +175,27 @@ const server = http.createServer((req, res) => {
   // Health check
   if (req.method === 'GET' && req.url === '/health') {
     sendJson(res, 200, { status: 'ok', port: PORT });
+    return;
+  }
+
+  // Get groups for the current API key
+  if (req.method === 'GET' && req.url === '/api/groups') {
+    const authHeader = req.headers['authorization'];
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      sendJson(res, 401, { error: 'Missing or invalid Authorization header' });
+      return;
+    }
+
+    const apiKey = authHeader.replace('Bearer ', '');
+    const keyId = computeKeyId(apiKey);
+    const groups = getGroupsForKey(keyId);
+
+    sendJson(res, 200, {
+      status: 'ok',
+      keyId,
+      groups,
+      totalGroups: groups.length
+    });
     return;
   }
 

@@ -75,6 +75,8 @@ Run `/evermem:help` to check if the plugin is configured correctly.
 | `/evermem:search <query>` | Search your memories for specific topics |
 | `/evermem:ask <question>` | Ask about past work (combines memory + context) |
 | `/evermem:hub` | Open the Memory Hub dashboard |
+| `/evermem:debug` | View debug logs for troubleshooting |
+| `/evermem:groups` | View tracked projects/memory groups |
 
 ### Automatic Behavior
 
@@ -100,10 +102,12 @@ Claude receives the relevant context and responds accordingly
 
 The Memory Hub provides a visual interface to explore your memories:
 
-- Activity heatmap (GitHub-style)
-- Memory statistics
-- Search and filter capabilities
-- Timeline view
+- Activity heatmap (GitHub-style, 6 months)
+- Memory statistics (Total, Projects, Active Days, Avg/Day, Avg/Project)
+- Last 7 Days growth chart
+- Project-based memory grouping with expandable cards
+- Timeline view within each project (grouped by date)
+- Load more pagination for large projects
 
 To use the hub, run `/evermem:hub` and follow the instructions.
 
@@ -213,11 +217,185 @@ Claude Code provides a **hooks system** that allows plugins to execute custom sc
 ```json
 {
   "hooks": {
-    "SessionStart": [...],        // Load session context
+    "SessionStart": [...],        // Load session context + track groups locally
     "UserPromptSubmit": [...],    // Search & inject memories
     "Stop": [...]                 // Save conversation to cloud
   }
 }
+```
+
+#### Local Groups Tracking
+
+The SessionStart hook automatically records project groups to `data/groups.jsonl` (JSONL format):
+
+```jsonl
+{"keyId":"9a823d2f8ea5","groupId":"claude-code:/path/a","name":"project-a","path":"/path/a","timestamp":"2026-02-09T06:00:00Z"}
+{"keyId":"9a823d2f8ea5","groupId":"claude-code:/path/a","name":"project-a","path":"/path/a","timestamp":"2026-02-09T07:00:00Z"}
+{"keyId":"9a823d2f8ea5","groupId":"claude-code:/path/b","name":"project-b","path":"/path/b","timestamp":"2026-02-09T08:00:00Z"}
+```
+
+**Fields:**
+- `keyId`: SHA-256 hash (first 12 chars) of the API key - associates groups with accounts
+- `groupId`: Unique identifier based on working directory path
+- `name`: Project folder name
+- `path`: Full path to the project
+- `timestamp`: When the session started
+
+**Why JSONL?**
+- Simple append operation (no need to read/parse entire file)
+- Aggregation happens on read (count sessions, find first/last seen)
+- No concurrent write issues
+
+**Deduplication:** Same `keyId + groupId` within 5 minutes is skipped to avoid duplicates from rapid restarts.
+
+View tracked groups with `/evermem:groups` command.
+
+### Memory Hub Implementation
+
+The `/evermem:hub` command opens a web dashboard for visualizing memories. Due to browser limitations (GET requests can't have body), a local proxy server bridges the dashboard and EverMem API.
+
+#### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           /evermem:hub Command                               │
+│  1. Start proxy server: node server/proxy.js &                              │
+│  2. Generate URL: http://localhost:3456/?key=${EVERMEM_API_KEY}             │
+│  3. User opens URL in browser                                                │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         Browser (dashboard.html)                             │
+│                                                                              │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐        │
+│  │   Stats     │  │  Heatmap    │  │  7-Day      │  │  Project    │        │
+│  │   Cards     │  │  (6 months) │  │  Chart      │  │   Cards     │        │
+│  └─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘        │
+│                                                                              │
+│  Data Flow:                                                                  │
+│  1. GET /api/groups → Local groups.jsonl (filtered by keyId)                │
+│  2. For each group: POST /api/v0/memories → Fetch memories                  │
+│  3. Render dashboard with aggregated data                                    │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                      Proxy Server (localhost:3456)                           │
+│                                                                              │
+│  Routes:                                                                     │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │  GET  /              → Serve dashboard.html                          │   │
+│  │  GET  /api/groups    → Read groups.jsonl, filter by keyId           │   │
+│  │  POST /api/v0/memories → Convert to GET+body, forward to API        │   │
+│  │  GET  /health        → Health check                                  │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                              │
+│  Why Proxy?                                                                  │
+│  - Browser limitation: GET requests can't have body                         │
+│  - EverMem API uses GET /api/v0/memories with JSON body                     │
+│  - Proxy receives POST, converts to GET+body using curl                     │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         EverMem Cloud API                                    │
+│                      https://api.evermind.ai                                 │
+│                                                                              │
+│  GET /api/v0/memories (with body)                                           │
+│  Request:  { user_id, group_id, memory_type, limit, offset }                │
+│  Response: { result: { memories[], total_count, has_more } }                │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+#### Proxy Server (`server/proxy.js`)
+
+```javascript
+// Key function: Convert API key to keyId (for groups filtering)
+function computeKeyId(apiKey) {
+  const hash = createHash('sha256').update(apiKey).digest('hex');
+  return hash.substring(0, 12);  // First 12 chars of SHA-256
+}
+
+// Key function: Read groups.jsonl and filter by keyId
+function getGroupsForKey(keyId) {
+  const content = readFileSync(GROUPS_FILE, 'utf8');
+  const lines = content.trim().split('\n');
+
+  const groupMap = new Map();
+  for (const line of lines) {
+    const entry = JSON.parse(line);
+    if (entry.keyId !== keyId) continue;  // Filter by current API key
+
+    // Aggregate: count sessions, track first/last seen
+    // ...
+  }
+  return Array.from(groupMap.values());
+}
+
+// Key route: Forward POST as GET+body (browser workaround)
+// Browser sends:  POST /api/v0/memories { body }
+// Proxy sends:    GET  /api/v0/memories { body } via curl
+```
+
+#### Dashboard (`assets/dashboard.html`)
+
+**Data Loading Flow:**
+
+```javascript
+async function loadGroups() {
+  // 1. Fetch groups from local storage (via proxy)
+  const groupsData = await fetch('/api/groups', {
+    headers: { 'Authorization': `Bearer ${apiKey}` }
+  });
+
+  // 2. For each group, fetch memories with pagination
+  for (const group of groups) {
+    const data = await fetch('/api/v0/memories', {
+      method: 'POST',
+      body: JSON.stringify({
+        user_id: 'claude-code-user',
+        group_id: group.id,
+        memory_type: 'episodic_memory',
+        limit: 100,
+        offset: 0
+      })
+    });
+
+    // Store: memories[], totalCount, hasMore, offset
+    groupMemories[group.id] = { ... };
+  }
+
+  // 3. Render dashboard
+  renderDashboard(totalMemories);
+}
+```
+
+**UI Components:**
+
+| Component | Description |
+|-----------|-------------|
+| Stats Grid | 5 cards: Total Memories, Projects, Active Days, Avg/Day, Avg/Project |
+| Heatmap | GitHub-style 6-month activity grid with tooltips |
+| Growth Chart | Last 7 days bar chart |
+| Project Cards | Expandable cards showing memories per project |
+| Timeline | Within each project, memories grouped by date |
+| Load More | Pagination button when `has_more: true` |
+
+**Timeline within Project:**
+
+```
+📁 evermem-claude-code (25 memories)
+├── ● Sun, Feb 9 [Today]               3 memories
+│   ├── 💭 Discussion about JWT...     10:30 AM
+│   ├── 🔧 Fixed authentication...     09:15 AM
+│   └── ✨ Created new API endpoint    08:00 AM
+│
+├── ● Sat, Feb 8                       5 memories
+│   ├── 📝 Updated README...           16:20 PM
+│   └── ...
+│
+└── [Load more (17 remaining)]
 ```
 
 ### Technical Details: Conversation Flow
@@ -308,18 +486,21 @@ System Events (hooks, timing)
 
 **Turn Level:** A "Turn" = User sends message → Claude fully responds
 
-Turn boundaries are marked by:
+**Turn boundary marker (ONLY this one):**
 ```json
 {"type":"system","subtype":"turn_duration","durationMs":30692}
 ```
 
+> **Note:** `file-history-snapshot` is NOT a turn boundary. It's a session-level marker that can appear anywhere in the file.
+
 **JSONL Structure:**
 ```
-Line 1:      file-history-snapshot  ← Session marker
+Line 1:      file-history-snapshot  ← Session marker (NOT turn boundary)
 Line 2-21:   Turn 1
-Line 22:     turn_duration          ← Turn 1 end
-Line 23-43:  Turn 2
-Line 44:     turn_duration          ← Turn 2 end
+Line 22:     turn_duration          ← Turn 1 end ✓
+Line 23:     file-history-snapshot  ← Can appear mid-session (NOT turn boundary)
+Line 24-43:  Turn 2
+Line 44:     turn_duration          ← Turn 2 end ✓
 ...
 ```
 
@@ -344,6 +525,7 @@ The `store-memories.js` hook extracts the **last complete Turn**:
 
 1. **Wait for completion** - Retry reading file until `turn_duration` marker appears (indicates turn is complete)
 2. **Find turn boundaries** - Start after last `turn_duration`, end at current `turn_duration`
+   - **ONLY** `turn_duration` is used as boundary (NOT `file-history-snapshot`)
 3. **Collect user text** - Original input only (skip `tool_result`)
 4. **Collect assistant text** - All `text` blocks (skip `thinking`, `tool_use`)
 5. **Merge content** - Join scattered text blocks with `\n\n` separator
@@ -557,21 +739,26 @@ source ~/.zshrc
 
 ```
 evermem-plugin/
-├── .claude-plugin/
-│   └── plugin.json           # Plugin manifest
+├── plugin.json               # Plugin manifest
 ├── commands/
 │   ├── help.md               # /evermem:help command
 │   ├── search.md             # /evermem:search command
-│   └── hub.md                # /evermem:hub command
+│   ├── hub.md                # /evermem:hub command
+│   ├── debug.md              # /evermem:debug command
+│   └── groups.md             # /evermem:groups command
+├── data/
+│   └── groups.jsonl          # Local storage for tracked projects (JSONL format)
 ├── hooks/
 │   ├── hooks.json            # Hook configuration
 │   └── scripts/
 │       ├── inject-memories.js    # Memory recall (UserPromptSubmit)
 │       ├── store-memories.js     # Memory save (Stop)
+│       ├── session-context.js    # Session context (SessionStart)
 │       └── utils/
 │           ├── evermem-api.js    # EverMem Cloud API client
 │           ├── config.js         # Configuration utilities
-│           └── debug.js          # Shared debug logging utility
+│           ├── debug.js          # Shared debug logging utility
+│           └── groups-store.js   # Local groups persistence
 ├── assets/
 │   └── dashboard.html        # Memory Hub dashboard
 ├── server/
