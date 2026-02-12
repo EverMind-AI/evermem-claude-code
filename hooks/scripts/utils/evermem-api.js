@@ -8,7 +8,10 @@ import { appendFileSync } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
 import { execSync } from 'child_process';
+import { debug, setDebugPrefix } from './debug.js';
 
+// Set debug prefix for this script
+setDebugPrefix('EverMemAPI');
 const TIMEOUT_MS = 30000; // 30 seconds
 const DEBUG = process.env.EVERMEM_DEBUG === '1';
 const LOG_FILE = join(homedir(), '.evermem-debug.log');
@@ -61,9 +64,9 @@ export async function searchMemories(query, options = {}) {
       requestBody.user_id = config.userId;
     }
     if (config.groupId) {
-      requestBody.group_id = config.groupId;
+      requestBody.group_ids = [config.groupId];
     }
-
+    debug('searchMemories request body', requestBody);
     clearTimeout(timeoutId);
 
     // Use curl since Node.js fetch doesn't support GET with body
@@ -220,7 +223,8 @@ function generateMessageId() {
 /**
  * Get memories from EverMem Cloud (ordered by time, old to new)
  * @param {Object} options - Options
- * @param {number} options.limit - Max results (default: 100)
+ * @param {number} options.page - Page number (default: 1)
+ * @param {number} options.pageSize - Results per page (default: 100, max: 100)
  * @param {string} options.memoryType - Memory type filter (default: 'episodic_memory')
  * @returns {Promise<Object>} API response with memories
  */
@@ -232,7 +236,8 @@ export async function getMemories(options = {}) {
   }
 
   const {
-    limit = 100,
+    page = 1,
+    pageSize = 100,
     memoryType = 'episodic_memory'
   } = options;
 
@@ -240,11 +245,12 @@ export async function getMemories(options = {}) {
   const params = new URLSearchParams({
     user_id: config.userId,
     memory_type: memoryType,
-    limit: limit.toString()
+    page: page.toString(),
+    page_size: pageSize.toString()
   });
 
   if (config.groupId) {
-    params.append('group_id', config.groupId);
+    params.append('group_ids', [config.groupId]);
   }
 
   const url = `${config.apiBaseUrl}/api/v0/memories?${params}`;

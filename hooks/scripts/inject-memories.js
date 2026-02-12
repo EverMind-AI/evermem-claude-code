@@ -95,6 +95,7 @@ async function main() {
         retrieveMethod: 'hybrid'
       });
       memories = transformSearchResults(apiResponse);
+      debug("memories:", memories);
       debug('search results:', { total: memories.length, memories: memories.map(m => ({ score: m.score, subject: m.subject })) });
     } catch (error) {
       // Silent on API errors - don't block user workflow

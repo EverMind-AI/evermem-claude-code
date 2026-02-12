@@ -49,6 +49,7 @@ export function getUserId() {
 /**
  * Get the group ID for memory operations
  * Uses project working directory as default group
+ * Format: {project_name_prefix_4}{path_hash_5} = 9 chars max
  * @returns {string} Group ID
  */
 export function getGroupId() {
@@ -57,7 +58,17 @@ export function getGroupId() {
   }
   // Use EVERMEM_CWD (set from hook input) or fall back to process.cwd()
   const cwd = process.env.EVERMEM_CWD || process.cwd();
-  return `claude-code:${cwd.replace(/[^a-zA-Z0-9-_/]/g, '_')}`;
+
+  // Extract project name (last part of path)
+  const projectName = cwd.split('/').filter(Boolean).pop() || 'proj';
+  // Take first 4 chars of project name (lowercase, alphanumeric only)
+  const namePrefix = projectName.toLowerCase().replace(/[^a-z0-9]/g, '').substring(0, 4) || 'proj';
+
+  // Hash the full path and take first 5 chars
+  const pathHash = createHash('sha256').update(cwd).digest('hex').substring(0, 5);
+
+  // Combine: 4 chars name + 5 chars hash = 9 chars
+  return `${namePrefix}${pathHash}`;
 }
 
 /**

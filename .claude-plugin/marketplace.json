@@ -10,7 +10,7 @@
       "name": "evermem",
       "source": "./",
       "description": "Automatic memory recall for Claude Code - remembers context from past sessions",
-      "version": "0.1.0",
+      "version": "0.1.3",
       "homepage": "https://evermind.ai",
       "repository": "https://github.com/EverMind-AI/evermem-claude-code",
       "license": "MIT"

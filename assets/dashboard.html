@@ -128,6 +128,19 @@
       text-overflow: ellipsis;
       white-space: nowrap;
     }
+    .group-id {
+      font-size: 10px;
+      color: #6e7681;
+      font-family: monospace;
+      margin-top: 2px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .group-id-label {
+      color: #484f58;
+      margin-right: 4px;
+    }
     .group-stats {
       display: flex;
       gap: 16px;
@@ -461,7 +474,7 @@
 
     let apiKey = '';
     let groups = [];
-    let groupMemories = {}; // { groupId: { memories: [], totalCount: 0, hasMore: false, offset: 0 } }
+    let groupMemories = {}; // { groupId: { memories: [], totalCount: 0, hasMore: false, page: 1 } }
 
     // Get API key from URL
     const urlParams = new URLSearchParams(window.location.search);
@@ -544,12 +557,12 @@
         let totalMemories = 0;
 
         await Promise.all(groups.map(async (group) => {
-          const data = await fetchMemoriesForGroup(group.id, 0, MEMORIES_PER_PAGE);
+          const data = await fetchMemoriesForGroup(group.id, 1, MEMORIES_PER_PAGE);
           groupMemories[group.id] = {
             memories: data.memories,
             totalCount: data.totalCount,
             hasMore: data.hasMore,
-            offset: data.memories.length
+            page: 2  // Next page to load
           };
           totalMemories += data.totalCount;
         }));
@@ -571,7 +584,7 @@
       }
     }
 
-    async function fetchMemoriesForGroup(groupId, offset, limit) {
+    async function fetchMemoriesForGroup(groupId, page, pageSize) {
       try {
         const response = await fetch(`${PROXY_URL}/api/v0/memories`, {
           method: 'POST',
@@ -581,10 +594,10 @@
           },
           body: JSON.stringify({
             user_id: 'claude-code-user',
-            group_id: groupId,
+            group_ids: [groupId],
             memory_type: 'episodic_memory',
-            limit: limit,
-            offset: offset
+            page: page,
+            page_size: pageSize
           })
         });
 
@@ -905,6 +918,7 @@
             <div class="group-info">
               <div class="group-name">${escapeHtml(group.name)}</div>
               <div class="group-path">${escapeHtml(group.path)}</div>
+              <div class="group-id"><span class="group-id-label">ID:</span>${escapeHtml(group.id)}</div>
             </div>
             <div class="group-stats">
               <span><span class="count">${memCount}</span> memories</span>
@@ -1021,11 +1035,11 @@
       btn.textContent = 'Loading...';
 
       try {
-        const data = await fetchMemoriesForGroup(groupId, gm.offset, MEMORIES_PER_PAGE);
+        const data = await fetchMemoriesForGroup(groupId, gm.page, MEMORIES_PER_PAGE);
 
         gm.memories = [...gm.memories, ...data.memories];
         gm.hasMore = data.hasMore;
-        gm.offset += data.memories.length;
+        gm.page += 1;
 
         // Re-render just this group's memories
         const container = document.getElementById(`memories-${encodeId(groupId)}`);

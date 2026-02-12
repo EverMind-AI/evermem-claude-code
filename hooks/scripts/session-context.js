@@ -2,7 +2,8 @@
 
 /**
  * EverMem SessionStart Hook
- * Retrieves recent memories and uses Claude Code SDK to generate a context summary
+ * Retrieves recent memories and displays last session summary
+ * No AI summarization - uses local data only
  */
 
 // Check Node.js version early
@@ -24,90 +25,65 @@ if (major < 18) {
   process.exit(0);
 }
 
+import { readFileSync, existsSync } from 'fs';
+import { resolve, dirname } from 'path';
+import { fileURLToPath } from 'url';
 import { getMemories, transformGetMemoriesResults } from './utils/evermem-api.js';
 import { getConfig, getGroupId } from './utils/config.js';
 import { saveGroup } from './utils/groups-store.js';
-import { query } from '@anthropic-ai/claude-agent-sdk';
-import { execSync } from 'child_process';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const SESSIONS_FILE = resolve(__dirname, '../../data/sessions.jsonl');
 
 const RECENT_MEMORY_COUNT = 5;  // Number of recent memories to load
-const FETCH_LIMIT = 100;        // Fetch more to get the latest (API returns old to new)
-const SUMMARIZE_TIMEOUT_MS = 15000;
+const PAGE_SIZE = 100;          // Fetch more to get the latest (API returns old to new)
 
 /**
- * Find the Claude Code executable path
+ * Get the most recent session summary for current group
+ * @param {string} groupId - The group ID to filter by
+ * @returns {Object|null} Most recent session summary or null
  */
-function findClaudeExecutable() {
+function getLastSessionSummary(groupId) {
   try {
-    const result = execSync('which claude', { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] });
-    return result.trim();
-  } catch {
-    try {
-      const result = execSync('where claude', { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] });
-      return result.trim().split('\n')[0];
-    } catch {
+    if (!existsSync(SESSIONS_FILE)) {
       return null;
     }
+
+    const content = readFileSync(SESSIONS_FILE, 'utf8');
+    const lines = content.trim().split('\n').filter(Boolean);
+
+    // Search from end (most recent first)
+    for (let i = lines.length - 1; i >= 0; i--) {
+      try {
+        const entry = JSON.parse(lines[i]);
+        if (entry.groupId === groupId) {
+          return entry;
+        }
+      } catch {}
+    }
+    return null;
+  } catch {
+    return null;
   }
 }
 
 /**
- * Use Claude Code SDK to summarize recent memories into current task context
+ * Format relative time (e.g., "2h ago", "1d ago")
  */
-async function summarizeContext(memories) {
-  const claudePath = findClaudeExecutable();
-  if (!claudePath) {
-    return null;
-  }
+function formatRelativeTime(isoTime) {
+  const now = Date.now();
+  const then = new Date(isoTime).getTime();
+  const diffMs = now - then;
 
-  const memoriesText = memories.map((m, i) => {
-    const date = new Date(m.timestamp).toLocaleDateString();
-    return `[${i + 1}] (${date}) ${m.subject}\n${m.text}`;
-  }).join('\n\n---\n\n');
+  const minutes = Math.floor(diffMs / 60000);
+  const hours = Math.floor(diffMs / 3600000);
+  const days = Math.floor(diffMs / 86400000);
 
-  const systemPrompt = `You are a concise context summarizer. Generate a brief summary of what tasks the user is currently working on based on their recent session memories.`;
-
-  const userPrompt = `Based on these recent session memories, write a 1-2 sentence summary of the user's recent work. Focus on the main task/project.
-
-RECENT MEMORIES:
-${memoriesText}
-
-Be concise and specific. Do not start with "Currently working on" or similar preamble.`;
-
-  const abortController = new AbortController();
-  const timeoutId = setTimeout(() => abortController.abort(), SUMMARIZE_TIMEOUT_MS);
-
-  try {
-    let responseText = '';
-
-    const queryResult = query({
-      prompt: userPrompt,
-      options: {
-        pathToClaudeCodeExecutable: claudePath,
-        model: 'haiku',
-        systemPrompt,
-        allowedTools: [],
-        abortController,
-        maxTurns: 1
-      }
-    });
-
-    for await (const message of queryResult) {
-      if (message.type === 'assistant' && message.message?.content) {
-        for (const block of message.message.content) {
-          if (block.type === 'text') {
-            responseText += block.text;
-          }
-        }
-      }
-    }
-
-    clearTimeout(timeoutId);
-    return responseText.trim();
-  } catch (error) {
-    clearTimeout(timeoutId);
-    return null;
-  }
+  if (minutes < 1) return 'just now';
+  if (minutes < 60) return `${minutes}m ago`;
+  if (hours < 24) return `${hours}h ago`;
+  if (days < 30) return `${days}d ago`;
+  return `${Math.floor(days / 30)}mo ago`;
 }
 
 async function main() {
@@ -153,12 +129,17 @@ async function main() {
   }
 
   try {
+    const groupId = getGroupId();
+
     // Fetch memories (API returns old to new, we'll reverse and take latest)
-    const response = await getMemories({ limit: FETCH_LIMIT });
+    const response = await getMemories({ pageSize: PAGE_SIZE });
     const memories = transformGetMemoriesResults(response);
 
-    if (memories.length === 0) {
-      // No memories yet, skip
+    // Get last session summary from local storage
+    const lastSession = getLastSessionSummary(groupId);
+
+    if (memories.length === 0 && !lastSession) {
+      // No memories and no last session, skip
       console.log(JSON.stringify({ continue: true }));
       return;
     }
@@ -166,37 +147,54 @@ async function main() {
     // Take the most recent memories
     const recentMemories = memories.slice(0, RECENT_MEMORY_COUNT);
 
-    // Generate summary using Claude Code SDK
-    const summary = await summarizeContext(recentMemories);
+    // Build context message for Claude (no AI summarization)
+    let contextParts = [];
 
-    // Build context message for Claude
-    let contextMessage;
-    if (summary) {
-      contextMessage = `<session-context>
-${summary}
-
-Recent session memories (${recentMemories.length} most recent):
-
-${recentMemories.map((m, i) => {
-  const date = new Date(m.timestamp).toLocaleDateString();
-  return `[${i + 1}] (${date}) ${m.subject}\n${m.text}`;
-}).join('\n\n---\n\n')}
-</session-context>`;
-    } else {
-      // Fallback if SDK summarization fails
-      contextMessage = `<session-context>
-Recent session memories from EverMem (${recentMemories.length} most recent):
-
-${recentMemories.map((m, i) => {
-  const date = new Date(m.timestamp).toLocaleDateString();
-  return `[${i + 1}] (${date}) ${m.subject}\n${m.text}`;
-}).join('\n\n---\n\n')}
-</session-context>`;
+    // Add last session info if available
+    if (lastSession) {
+      const timeAgo = formatRelativeTime(lastSession.timestamp);
+      contextParts.push(`Last session (${timeAgo}, ${lastSession.turnCount} turns): ${lastSession.summary}`);
     }
 
-    const displayOutput = summary
-      ? `💡 EverMem Reminder: ${summary}`
-      : `💡 EverMem Reminder: ${recentMemories.length} recent memories loaded`;
+    // Add recent memories if available
+    if (recentMemories.length > 0) {
+      const memoriesText = recentMemories.map((m, i) => {
+        const date = new Date(m.timestamp).toLocaleDateString();
+        return `[${i + 1}] (${date}) ${m.subject}\n${m.text}`;
+      }).join('\n\n---\n\n');
+      contextParts.push(`Recent memories (${recentMemories.length}):\n\n${memoriesText}`);
+    }
+
+    const contextMessage = `<session-context>\n${contextParts.join('\n\n')}\n</session-context>`;
+
+    // Build display output - show meaningful content, concise but informative
+    let displayOutput;
+    if (lastSession) {
+      // Show last session: time, turns, summary
+      const truncatedSummary = lastSession.summary.length > 40
+        ? lastSession.summary.substring(0, 40) + '...'
+        : lastSession.summary;
+      const timeAgo = formatRelativeTime(lastSession.timestamp);
+      displayOutput = `💡 EverMem: Last (${timeAgo}, ${lastSession.turnCount} turns): "${truncatedSummary}"`;
+
+      // Add memory preview if available
+      if (recentMemories.length > 0) {
+        const memorySubjects = recentMemories.slice(0, 2).map(m => {
+          const subj = m.subject || '';
+          return subj.length > 15 ? subj.substring(0, 15) + '..' : subj;
+        }).join(', ');
+        displayOutput += ` | ${recentMemories.length} memories: ${memorySubjects}`;
+      }
+    } else if (recentMemories.length > 0) {
+      // No last session, show recent memories with subjects
+      const memorySubjects = recentMemories.slice(0, 3).map(m => {
+        const subj = m.subject || '';
+        return subj.length > 20 ? subj.substring(0, 20) + '..' : subj;
+      }).join(', ');
+      displayOutput = `💡 EverMem: ${recentMemories.length} memories: ${memorySubjects}`;
+    } else {
+      displayOutput = `💡 EverMem: Ready`;
+    }
 
     // Output: display to user and add to context
     console.log(JSON.stringify({

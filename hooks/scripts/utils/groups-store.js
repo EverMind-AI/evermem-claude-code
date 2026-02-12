@@ -1,7 +1,7 @@
 /**
  * Groups Store - Local persistence for memory groups (JSONL format)
  *
- * Each line records a session start event. Aggregation happens on read.
+ * Each groupId+keyId combination is stored only once (no duplicates).
  * Format: {"keyId":"...","groupId":"...","name":"...","path":"...","timestamp":"..."}
  *
  * keyId: SHA-256 hash (first 12 chars) of the API key - identifies which account owns this group
@@ -15,16 +15,13 @@ import { getKeyId } from './config.js';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const GROUPS_FILE = resolve(__dirname, '../../../data/groups.jsonl');
 
-// Minimum interval between recording same group (5 minutes)
-const DEDUP_INTERVAL_MS = 5 * 60 * 1000;
-
 /**
- * Check if the same groupId+keyId combination was recorded recently
+ * Check if the groupId+keyId combination already exists in the file
  * @param {string} groupId - The group ID to check
  * @param {string} keyId - The key ID (hashed API key) to check
- * @returns {boolean} True if recently recorded (should skip)
+ * @returns {boolean} True if already exists (should skip)
  */
-function wasRecentlyRecorded(groupId, keyId) {
+function alreadyExists(groupId, keyId) {
   try {
     if (!existsSync(GROUPS_FILE)) {
       return false;
@@ -32,22 +29,13 @@ function wasRecentlyRecorded(groupId, keyId) {
 
     const content = readFileSync(GROUPS_FILE, 'utf8');
     const lines = content.trim().split('\n').filter(Boolean);
-    const now = Date.now();
 
-    // Search from end (most recent first) for efficiency
-    for (let i = lines.length - 1; i >= 0; i--) {
+    for (const line of lines) {
       try {
-        const entry = JSON.parse(lines[i]);
+        const entry = JSON.parse(line);
         // Match both groupId AND keyId (same project + same API key)
         if (entry.groupId === groupId && entry.keyId === keyId) {
-          const entryTime = new Date(entry.timestamp).getTime();
-          const elapsed = now - entryTime;
-          // If found within dedup interval, skip
-          if (elapsed < DEDUP_INTERVAL_MS) {
-            return true;
-          }
-          // If found but older than interval, allow new entry
-          return false;
+          return true;
         }
       } catch {}
     }
@@ -58,8 +46,8 @@ function wasRecentlyRecorded(groupId, keyId) {
 }
 
 /**
- * Append a session start event to the JSONL file
- * Only records if the same groupId+keyId wasn't recorded in the last 5 minutes
+ * Append a group entry to the JSONL file
+ * Only records if the groupId+keyId combination doesn't already exist
  * @param {string} groupId - The group ID
  * @param {string} cwd - The working directory path
  * @returns {Object|null} The entry if saved, null if skipped or error
@@ -68,8 +56,8 @@ export function saveGroup(groupId, cwd) {
   try {
     const keyId = getKeyId();
 
-    // Deduplication: skip if same groupId+keyId was recorded recently
-    if (wasRecentlyRecorded(groupId, keyId)) {
+    // Skip if this groupId+keyId already exists
+    if (alreadyExists(groupId, keyId)) {
       return null;
     }
 
