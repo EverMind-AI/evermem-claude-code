@@ -6,8 +6,9 @@ Persistent memory for Claude Code. Automatically saves and recalls context from 
 
 ## Features
 
-- **Automatic Memory Retrieved** - Relevant memories are retrieved when you submit a prompt
 - **Automatic Memory Save** - Conversations are saved when Claude finishes responding
+- **Automatic Memory Retrieval** - Relevant memories are retrieved when you submit a prompt
+- **Session Context** - Recent work summary loaded on session start
 - **Memory Search** - Manually search your memory history
 - **Memory Hub** - Visual dashboard to explore and manage memories
 
@@ -75,10 +76,18 @@ Run `/evermem:help` to check if the plugin is configured correctly.
 | `/evermem:search <query>` | Search your memories for specific topics |
 | `/evermem:ask <question>` | Ask about past work (combines memory + context) |
 | `/evermem:hub` | Open the Memory Hub dashboard |
+| `/evermem:debug` | View debug logs for troubleshooting |
+| `/evermem:projects` | View your Claude Code projects table |
 
 ### Automatic Behavior
 
 The plugin works automatically in the background:
+
+**On Session Start:**
+```
+💡 EverMem: Last session (2h ago): "Implementing JWT authentication..." | 3 memories
+```
+Recent memories and last session summary are loaded to provide context.
 
 **On Prompt Submit:**
 ```
@@ -100,18 +109,110 @@ Claude receives the relevant context and responds accordingly
 
 The Memory Hub provides a visual interface to explore your memories:
 
-- Activity heatmap (GitHub-style)
-- Memory statistics
-- Search and filter capabilities
-- Timeline view
+- Activity heatmap (GitHub-style, 6 months)
+- Memory statistics (Total, Projects, Active Days, Avg/Day, Avg/Project)
+- Last 7 Days growth chart
+- Project-based memory grouping with expandable cards
+- Timeline view within each project (grouped by date)
+- Load more pagination for large projects
 
 To use the hub, run `/evermem:hub` and follow the instructions.
+
+## Configuration
+
+### Environment Variables
+
+| Variable | Description | Required |
+|----------|-------------|----------|
+| `EVERMEM_API_KEY` | Your EverMem API key | Yes |
+
+### Project-Specific Settings
+
+Create `.claude/evermem.local.md` in your project root for per-project configuration:
+
+```markdown
+---
+group_id: "my-project"
+---
+
+Project-specific notes here.
+```
+
+## Troubleshooting
+
+### API Key Not Configured
+
+```bash
+# Check if the key is set
+echo $EVERMEM_API_KEY
+
+# If empty, add to your shell profile and reload
+export EVERMEM_API_KEY="your-key-here"
+source ~/.zshrc
+```
+
+### No Memories Found
+
+1. Memories are only recalled after you've had previous conversations
+2. Short prompts (less than 3 words) are skipped
+3. Check that your API key is valid at [console.evermind.ai](https://console.evermind.ai/)
+
+### API Errors
+
+- **403 Forbidden**: Invalid or expired API key
+- **502 Bad Gateway**: Server temporarily unavailable, try again
+
+### Debug Mode
+
+Enable debug logging to troubleshoot issues:
+
+```bash
+# Set environment variable
+export EVERMEM_DEBUG=1
+
+# View logs in real-time
+tail -f /tmp/evermem-debug.log
+
+# Clear logs
+> /tmp/evermem-debug.log
+```
+
+Run `/evermem:debug` to view recent debug logs directly.
+
+## Links
+
+- **Console**: [console.evermind.ai](https://console.evermind.ai/)
+- **API Documentation**: [docs.evermind.ai](https://docs.evermind.ai)
+- **Issues**: [GitHub Issues](https://github.com/EverMind-AI/evermem-claude-code/issues)
+
+## License
+
+MIT
+
+---
+
+# Technical Details
+
+The following sections explain how EverMem works internally. This is useful for developers who want to understand the implementation or contribute to the project.
 
 ## How It Works
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                     Your Prompt                             │
+│                     Session Start                            │
+└─────────────────────────────────────────────────────────────┘
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────────┐
+│  SessionStart Hook                                          │
+│  • Fetches recent memories from EverMem Cloud               │
+│  • Loads last session summary from local storage            │
+│  • Injects session context into Claude's prompt             │
+└─────────────────────────────────────────────────────────────┘
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────────┐
+│                     Your Prompt                              │
 └─────────────────────────────────────────────────────────────┘
                             │
                             ▼
@@ -124,7 +225,7 @@ To use the hub, run `/evermem:hub` and follow the instructions.
                             │
                             ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                   Claude Response                           │
+│                   Claude Response                            │
 └─────────────────────────────────────────────────────────────┘
                             │
                             ▼
@@ -134,15 +235,28 @@ To use the hub, run `/evermem:hub` and follow the instructions.
 │  • Sends to EverMem Cloud for storage                       │
 │  • Server generates summary and stores memory               │
 └─────────────────────────────────────────────────────────────┘
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────────┐
+│                     Session End                              │
+└─────────────────────────────────────────────────────────────┘
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────────┐
+│  SessionEnd Hook                                            │
+│  • Parses transcript to extract first user prompt           │
+│  • Saves session summary to local storage                   │
+│  • No AI calls - pure local data extraction                 │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-### Claude Code Hooks Mechanism
+## Claude Code Hooks Mechanism
 
-> Reference: [Claude Code Hooks Documentation](https://code.claude.com/docs/zh-CN/hooks)
+> Reference: [Claude Code Hooks Documentation](https://docs.anthropic.com/en/docs/claude-code/hooks)
 
 Claude Code provides a **hooks system** that allows plugins to execute custom scripts at specific lifecycle events. Hooks are **event-driven** - they don't run continuously but are triggered by Claude Code at specific moments.
 
-#### How Hooks Work
+### How Hooks Work
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -172,7 +286,7 @@ Claude Code provides a **hooks system** that allows plugins to execute custom sc
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-#### Hook Events
+### Hook Events
 
 | Event | Trigger | Use Case |
 |-------|---------|----------|
@@ -183,7 +297,7 @@ Claude Code provides a **hooks system** that allows plugins to execute custom sc
 | `Stop` | Claude finishes responding | Save conversation, cleanup |
 | `Notification` | System notification | Custom alerts |
 
-#### Plugin hooks.json Configuration
+### Plugin hooks.json Configuration
 
 ```json
 {
@@ -208,23 +322,290 @@ Claude Code provides a **hooks system** that allows plugins to execute custom sc
 - `${CLAUDE_PLUGIN_ROOT}` - Plugin directory path (for plugins)
 - `${CLAUDE_PROJECT_DIR}` - Project root directory
 
-#### EverMem Plugin Hooks
+### EverMem Plugin Hooks
 
 ```json
 {
   "hooks": {
-    "SessionStart": [...],        // Load session context
+    "SessionStart": [...],        // Load session context + track groups locally
     "UserPromptSubmit": [...],    // Search & inject memories
-    "Stop": [...]                 // Save conversation to cloud
+    "Stop": [...],                // Save conversation to cloud
+    "SessionEnd": [...]           // Save session summary locally
   }
 }
 ```
 
-### Technical Details: Conversation Flow
+## SessionStart Hook
+
+The SessionStart hook runs when Claude Code starts a new session. It loads recent memories from the cloud and last session summary from local storage.
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    Claude Code Session Start                     │
+│                                                                  │
+│  1. Claude Code spawns: session-context-wrapper.sh              │
+│  2. Wrapper checks npm dependencies                              │
+│  3. Wrapper executes: node session-context.js                   │
+└─────────────────────────────────────────────────────────────────┘
+                               │
+                               ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    session-context.js                            │
+│                                                                  │
+│  1. Read hook input from stdin (contains cwd)                   │
+│  2. Save group to local storage (groups.jsonl)                  │
+│  3. Fetch recent memories from EverMem API (limit: 100)         │
+│  4. Take the 5 most recent memories                             │
+│  5. Get last session summary from sessions.jsonl                │
+│  6. Output systemMessage + systemPrompt via stdout              │
+└─────────────────────────────────────────────────────────────────┘
+                               │
+                               ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    Claude Code Receives                          │
+│                                                                  │
+│  • systemMessage: "💡 EverMem: Last session (2h ago): \"...\" | 5 memories"│
+│  • systemPrompt: <session-context>...</session-context>         │
+│                                                                  │
+│  The systemPrompt is injected into Claude's context window      │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Hook Input (stdin)
+
+```json
+{
+  "session_id": "<session-uuid>",
+  "cwd": "/path/to/your/project",
+  "permission_mode": "default",
+  "hook_event_name": "SessionStart"
+}
+```
+
+### Hook Output (stdout)
+
+```json
+{
+  "continue": true,
+  "systemMessage": "💡 EverMem: Last session (2h ago): \"Implementing JWT authentication...\" | 5 memories",
+  "systemPrompt": "<session-context>\nLast session (2h ago, 5 turns): Implementing JWT authentication for the API\n\nRecent memories (5):\n\n[1] (2/9/2026) JWT token implementation\n...\n</session-context>"
+}
+```
+
+### Output Fields
+
+| Field | Description |
+|-------|-------------|
+| `continue` | Always `true` - never block session start |
+| `systemMessage` | Displayed to user in terminal |
+| `systemPrompt` | Injected into Claude's context (invisible to user) |
+
+### Data Sources
+
+The hook combines two data sources:
+
+1. **Cloud Memories** - Recent memories from EverMem API (5 most recent)
+2. **Local Session Summary** - Last session from `data/sessions.jsonl` (saved by SessionEnd hook)
+
+No AI summarization is used - pure local data extraction for zero latency and no additional API costs.
+
+### Error Handling
+
+| Error Type | User Message |
+|------------|--------------|
+| Network error | "Cannot reach EverMem server. Check your internet connection." |
+| Timeout | "EverMem server is slow or unreachable." |
+| 401/Unauthorized | "Authentication failed. Check your EVERMEM_API_KEY." |
+| 404 | "API endpoint not found. Check EVERMEM_BASE_URL." |
+| Module not found | "Missing dependency. Run: npm install" |
+
+All errors return `continue: true` to ensure session starts normally.
+
+### Node.js Version Check
+
+The hook requires Node.js 18+ for ES modules support. If an older version is detected:
+
+```json
+{
+  "continue": true,
+  "systemMessage": "⚠️ EverMem: Node.js 16.x is too old. Please upgrade to Node.js 18+."
+}
+```
+
+## SessionEnd Hook
+
+The SessionEnd hook runs when a Claude Code session ends. It saves a session summary to local storage for use by the SessionStart hook.
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    Claude Code Session End                       │
+│                                                                  │
+│  Triggers: /exit, closing terminal, idle timeout                 │
+│  Claude Code spawns: node session-summary.js                    │
+└─────────────────────────────────────────────────────────────────┘
+                               │
+                               ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    session-summary.js                            │
+│                                                                  │
+│  1. Read hook input from stdin (contains transcript_path)       │
+│  2. Check if session already summarized (skip if yes)           │
+│  3. Parse transcript JSONL file                                 │
+│  4. Extract: first user prompt, turn count, timestamps          │
+│  5. Save to data/sessions.jsonl                                 │
+└─────────────────────────────────────────────────────────────────┘
+                               │
+                               ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    Local Storage                                 │
+│                                                                  │
+│  data/sessions.jsonl:                                           │
+│  {"sessionId":"abc","groupId":"...","summary":"First user       │
+│   prompt truncated to 200 chars","turnCount":5,...}             │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Hook Input (stdin)
+
+```json
+{
+  "session_id": "<session-uuid>",
+  "transcript_path": "~/.claude/projects/<hash>/<session-uuid>.jsonl",
+  "cwd": "/path/to/your/project",
+  "reason": "user_exit",
+  "hook_event_name": "SessionEnd"
+}
+```
+
+### Hook Output (stdout)
+
+```json
+{
+  "systemMessage": "📝 Session saved (5 turns): Implementing JWT authentication for the..."
+}
+```
+
+### Session Summary Format
+
+Each session is saved as a single line in `data/sessions.jsonl`:
+
+```json
+{
+  "sessionId": "<session-uuid>",
+  "groupId": "claude-code:/path/to/project",
+  "summary": "First user prompt truncated to 200 characters",
+  "turnCount": 5,
+  "reason": "user_exit",
+  "startTime": "2026-02-09T10:00:00.000Z",
+  "endTime": "2026-02-09T10:30:00.000Z",
+  "timestamp": "2026-02-09T10:30:05.000Z"
+}
+```
+
+### Fields
+
+| Field | Description |
+|-------|-------------|
+| `sessionId` | Unique session identifier (from Claude Code) |
+| `groupId` | Project identifier (based on working directory) |
+| `summary` | First user prompt (truncated to 200 chars) |
+| `turnCount` | Number of conversation turns |
+| `reason` | Why session ended (user_exit, idle_timeout, etc.) |
+| `startTime` | First message timestamp |
+| `endTime` | Last message timestamp |
+| `timestamp` | When summary was saved |
+
+### Deduplication
+
+Each session is only saved once. Before saving, the hook checks if the sessionId already exists in `sessions.jsonl`.
+
+### No AI Summarization
+
+The SessionEnd hook uses a simple approach: the first user prompt becomes the session summary. This provides:
+
+- **Zero latency** - No API calls needed
+- **Zero cost** - No Haiku or other model usage
+- **Reliability** - Works offline, no external dependencies
+
+The first user prompt typically describes what the user wanted to accomplish, making it a natural summary of the session's purpose.
+
+### Design Philosophy: Deferred Display Pattern
+
+The SessionEnd and SessionStart hooks work together using a **"save now, display later"** pattern:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  Session A (ending)                                             │
+│                                                                 │
+│  SessionEnd Hook:                                               │
+│  • Extracts first user prompt, turn count, duration             │
+│  • Saves to sessions.jsonl                                      │
+│  • Output NOT displayed (session already closed)                │
+└─────────────────────────────────────────────────────────────────┘
+                               │
+                               │  sessions.jsonl (local storage)
+                               │
+                               ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  Session B (starting)                                           │
+│                                                                 │
+│  SessionStart Hook:                                             │
+│  • Reads last session from sessions.jsonl                       │
+│  • Displays: "Last (2h ago, 5 turns): Your question..."         │
+│  • Provides continuity across sessions                          │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Why this design?**
+
+1. **SessionEnd can't display messages** - When a session ends (`/exit`, `Ctrl+D`), the terminal is closing. Any `systemMessage` output would be lost or not visible to the user.
+
+2. **SessionStart is the right moment** - The next time the user opens Claude Code, they see what they were working on. This creates a natural "welcome back" experience.
+
+3. **Local-first architecture** - Session summaries are stored locally in `sessions.jsonl`, not in the cloud. This ensures:
+   - Instant access (no API latency)
+   - Works offline
+   - No additional API costs
+   - Privacy (session data stays on your machine)
+
+4. **Graceful degradation** - If SessionEnd fails to run (e.g., `Ctrl+C` force quit), the next SessionStart still works with cloud memories. No single point of failure.
+
+**Data Flow Summary:**
+
+| Event | Action | Storage | Display |
+|-------|--------|---------|---------|
+| SessionEnd | Save summary | Local (sessions.jsonl) | None |
+| SessionStart | Read summary | Local + Cloud | Yes |
+
+## Local Groups Tracking
+
+The SessionStart hook automatically records project groups to `data/groups.jsonl` (JSONL format):
+
+```jsonl
+{"keyId":"9a823d2f8ea5","groupId":"claude-code:/path/to/project-a","name":"project-a","path":"/path/to/project-a","timestamp":"2026-02-09T06:00:00Z"}
+{"keyId":"9a823d2f8ea5","groupId":"claude-code:/path/to/api-server","name":"api-server","path":"/path/to/api-server","timestamp":"2026-02-09T08:00:00Z"}
+```
+
+**Fields:**
+- `keyId`: SHA-256 hash (first 12 chars) of the API key - associates groups with accounts
+- `groupId`: Unique identifier based on working directory, format: `claude-code:{path}`
+- `name`: Project folder name
+- `path`: Full path to the project
+- `timestamp`: When the group was first recorded
+
+**Deduplication:** Each `keyId + groupId` combination is stored only once (no duplicates).
+
+View tracked projects with `/evermem:projects` command.
+
+## Stop Hook: Conversation Flow
 
 Claude Code stores all conversations locally in JSONL (JSON Lines) format. The EverMem plugin reads this transcript and uploads the latest Q&A pair to the cloud.
 
-#### 1. Hook Input
+### Hook Input
 
 When Claude finishes responding, the Stop hook receives input like this:
 
@@ -239,7 +620,7 @@ When Claude finishes responding, the Stop hook receives input like this:
 }
 ```
 
-#### 2. Transcript File Format
+### Transcript File Format
 
 The transcript file (`*.jsonl`) contains one JSON object per line, recording every message and event in the session. **Important:** A single Claude response may span multiple lines with different content types.
 
@@ -302,24 +683,27 @@ User Input
 System Events (hooks, timing)
 ```
 
-#### 3. Turn Boundary & Segmentation
+### Turn Boundary & Segmentation
 
 **Session Level:** One JSONL file = One Session (filename is session ID)
 
 **Turn Level:** A "Turn" = User sends message → Claude fully responds
 
-Turn boundaries are marked by:
+**Turn boundary marker (ONLY this one):**
 ```json
 {"type":"system","subtype":"turn_duration","durationMs":30692}
 ```
 
+> **Note:** `file-history-snapshot` is NOT a turn boundary. It's a session-level marker that can appear anywhere in the file.
+
 **JSONL Structure:**
 ```
-Line 1:      file-history-snapshot  ← Session marker
+Line 1:      file-history-snapshot  ← Session marker (NOT turn boundary)
 Line 2-21:   Turn 1
-Line 22:     turn_duration          ← Turn 1 end
-Line 23-43:  Turn 2
-Line 44:     turn_duration          ← Turn 2 end
+Line 22:     turn_duration          ← Turn 1 end ✓
+Line 23:     file-history-snapshot  ← Can appear mid-session (NOT turn boundary)
+Line 24-43:  Turn 2
+Line 44:     turn_duration          ← Turn 2 end ✓
 ...
 ```
 
@@ -338,12 +722,13 @@ assistant/text (parent: ...)       ← Final response
 system/turn_duration (parent: ...) ← Turn end
 ```
 
-#### 4. Memory Extraction
+### Memory Extraction
 
 The `store-memories.js` hook extracts the **last complete Turn**:
 
 1. **Wait for completion** - Retry reading file until `turn_duration` marker appears (indicates turn is complete)
 2. **Find turn boundaries** - Start after last `turn_duration`, end at current `turn_duration`
+   - **ONLY** `turn_duration` is used as boundary (NOT `file-history-snapshot`)
 3. **Collect user text** - Original input only (skip `tool_result`)
 4. **Collect assistant text** - All `text` blocks (skip `thinking`, `tool_use`)
 5. **Merge content** - Join scattered text blocks with `\n\n` separator
@@ -375,9 +760,9 @@ async function readTranscriptWithRetry(path) {
 
 The hook merges all `text` blocks to capture the complete response.
 
-#### 5. API Upload
+### API Upload
 
-Each message is sent to `POST /api/v1/memories`:
+Each message is sent to `POST /api/v0/memories`:
 
 ```json
 {
@@ -400,22 +785,167 @@ Response on success:
 }
 ```
 
-#### 5. Debug Mode
+### Hook Output (stdout)
 
-Enable debug logging to troubleshoot issues:
+The hook returns JSON via stdout to communicate with Claude Code:
 
-```bash
-# Add to .env file in plugin directory
-EVERMEM_DEBUG=1
-
-# View logs in real-time
-tail -f /tmp/evermem-debug.log
-
-# Clear logs
-> /tmp/evermem-debug.log
+```json
+{
+  "systemMessage": "💾 Memory saved (2) [user: 59, assistant: 127]"
+}
 ```
 
-**Shared Debug Utility (`hooks/scripts/utils/debug.js`)**
+This message is displayed to the user after Claude finishes responding.
+
+## Memory Hub Implementation
+
+The `/evermem:hub` command opens a web dashboard for visualizing memories. Due to browser limitations (GET requests can't have body), a local proxy server bridges the dashboard and EverMem API.
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           /evermem:hub Command                               │
+│  1. Start proxy server: node server/proxy.js &                              │
+│  2. Generate URL: http://localhost:3456/?key=${EVERMEM_API_KEY}             │
+│  3. User opens URL in browser                                                │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         Browser (dashboard.html)                             │
+│                                                                              │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐        │
+│  │   Stats     │  │  Heatmap    │  │  7-Day      │  │  Project    │        │
+│  │   Cards     │  │  (6 months) │  │  Chart      │  │   Cards     │        │
+│  └─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘        │
+│                                                                              │
+│  Data Flow:                                                                  │
+│  1. GET /api/groups → Local groups.jsonl (filtered by keyId)                │
+│  2. For each group: POST /api/v0/memories → Fetch memories                  │
+│  3. Render dashboard with aggregated data                                    │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                      Proxy Server (localhost:3456)                           │
+│                                                                              │
+│  Routes:                                                                     │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │  GET  /              → Serve dashboard.html                          │   │
+│  │  GET  /api/groups    → Read groups.jsonl, filter by keyId           │   │
+│  │  POST /api/v0/memories → Convert to GET+body, forward to API        │   │
+│  │  GET  /health        → Health check                                  │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                              │
+│  Why Proxy?                                                                  │
+│  - Browser limitation: GET requests can't have body                         │
+│  - EverMem API uses GET /api/v0/memories with JSON body                     │
+│  - Proxy receives POST, converts to GET+body using curl                     │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         EverMem Cloud API                                    │
+│                      https://api.evermind.ai                                 │
+│                                                                              │
+│  GET /api/v0/memories (with body)                                           │
+│  Request:  { user_id, group_id, memory_type, limit, offset }                │
+│  Response: { result: { memories[], total_count, has_more } }                │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Proxy Server (`server/proxy.js`)
+
+```javascript
+// Key function: Convert API key to keyId (for groups filtering)
+function computeKeyId(apiKey) {
+  const hash = createHash('sha256').update(apiKey).digest('hex');
+  return hash.substring(0, 12);  // First 12 chars of SHA-256
+}
+
+// Key function: Read groups.jsonl and filter by keyId
+function getGroupsForKey(keyId) {
+  const content = readFileSync(GROUPS_FILE, 'utf8');
+  const lines = content.trim().split('\n');
+
+  const groupMap = new Map();
+  for (const line of lines) {
+    const entry = JSON.parse(line);
+    if (entry.keyId !== keyId) continue;  // Filter by current API key
+
+    // Aggregate: count sessions, track first/last seen
+    // ...
+  }
+  return Array.from(groupMap.values());
+}
+
+// Key route: Forward POST as GET+body (browser workaround)
+// Browser sends:  POST /api/v0/memories { body }
+// Proxy sends:    GET  /api/v0/memories { body } via curl
+```
+
+### Dashboard (`assets/dashboard.html`)
+
+**Data Loading Flow:**
+
+```javascript
+async function loadGroups() {
+  // 1. Fetch groups from local storage (via proxy)
+  const groupsData = await fetch('/api/groups', {
+    headers: { 'Authorization': `Bearer ${apiKey}` }
+  });
+
+  // 2. For each group, fetch memories with pagination
+  for (const group of groups) {
+    const data = await fetch('/api/v0/memories', {
+      method: 'POST',
+      body: JSON.stringify({
+        user_id: 'claude-code-user',
+        group_id: group.id,
+        memory_type: 'episodic_memory',
+        limit: 100,
+        offset: 0
+      })
+    });
+
+    // Store: memories[], totalCount, hasMore, offset
+    groupMemories[group.id] = { ... };
+  }
+
+  // 3. Render dashboard
+  renderDashboard(totalMemories);
+}
+```
+
+**UI Components:**
+
+| Component | Description |
+|-----------|-------------|
+| Stats Grid | 5 cards: Total Memories, Projects, Active Days, Avg/Day, Avg/Project |
+| Heatmap | GitHub-style 6-month activity grid with tooltips |
+| Growth Chart | Last 7 days bar chart |
+| Project Cards | Expandable cards showing memories per project |
+| Timeline | Within each project, memories grouped by date |
+| Load More | Pagination button when `has_more: true` |
+
+**Timeline within Project:**
+
+```
+📁 evermem-claude-code (25 memories)
+├── ● Sun, Feb 9 [Today]               3 memories
+│   ├── 💭 Discussion about JWT...     10:30 AM
+│   ├── 🔧 Fixed authentication...     09:15 AM
+│   └── ✨ Created new API endpoint    08:00 AM
+│
+├── ● Sat, Feb 8                       5 memories
+│   ├── 📝 Updated README...           16:20 PM
+│   └── ...
+│
+└── [Load more (17 remaining)]
+```
+
+## Debug Logging
 
 Both `inject-memories.js` and `store-memories.js` use a shared debug utility:
 
@@ -497,81 +1027,32 @@ if (isDebugEnabled()) {
 }
 ```
 
-#### 6. Hook Output (stdout)
-
-The hook returns JSON via stdout to communicate with Claude Code:
-
-```json
-{
-  "systemMessage": "💾 Memory saved (2) [user: 59, assistant: 127]"
-}
-```
-
-This message is displayed to the user after Claude finishes responding.
-
-## Configuration
-
-### Environment Variables
-
-| Variable | Description | Required |
-|----------|-------------|----------|
-| `EVERMEM_API_KEY` | Your EverMem API key | Yes |
-
-### Project-Specific Settings
-
-Create `.claude/evermem.local.md` in your project root for per-project configuration:
-
-```markdown
----
-group_id: "my-project"
----
-
-Project-specific notes here.
-```
-
-## Troubleshooting
-
-### API Key Not Configured
-
-```bash
-# Check if the key is set
-echo $EVERMEM_API_KEY
-
-# If empty, add to your shell profile and reload
-export EVERMEM_API_KEY="your-key-here"
-source ~/.zshrc
-```
-
-### No Memories Found
-
-1. Memories are only recalled after you've had previous conversations
-2. Short prompts (less than 3 words) are skipped
-3. Check that your API key is valid at [console.evermind.ai](https://console.evermind.ai/)
-
-### API Errors
-
-- **403 Forbidden**: Invalid or expired API key
-- **502 Bad Gateway**: Server temporarily unavailable, try again
-
 ## Project Structure
 
 ```
 evermem-plugin/
-├── .claude-plugin/
-│   └── plugin.json           # Plugin manifest
+├── plugin.json               # Plugin manifest
 ├── commands/
 │   ├── help.md               # /evermem:help command
 │   ├── search.md             # /evermem:search command
-│   └── hub.md                # /evermem:hub command
+│   ├── hub.md                # /evermem:hub command
+│   ├── debug.md              # /evermem:debug command
+│   └── projects.md           # /evermem:projects command
+├── data/
+│   ├── groups.jsonl          # Local storage for tracked projects (JSONL format)
+│   └── sessions.jsonl        # Local storage for session summaries (JSONL format)
 ├── hooks/
 │   ├── hooks.json            # Hook configuration
 │   └── scripts/
 │       ├── inject-memories.js    # Memory recall (UserPromptSubmit)
 │       ├── store-memories.js     # Memory save (Stop)
+│       ├── session-context.js    # Session context (SessionStart)
+│       ├── session-summary.js    # Session summary (SessionEnd)
 │       └── utils/
 │           ├── evermem-api.js    # EverMem Cloud API client
 │           ├── config.js         # Configuration utilities
-│           └── debug.js          # Shared debug logging utility
+│           ├── debug.js          # Shared debug logging utility
+│           └── groups-store.js   # Local groups persistence
 ├── assets/
 │   └── dashboard.html        # Memory Hub dashboard
 ├── server/
@@ -583,8 +1064,9 @@ evermem-plugin/
 
 The plugin uses the EverMem Cloud API at `https://api.evermind.ai`:
 
-- `POST /api/v1/memories` - Store a new memory
-- `POST /api/v1/memories/search` - Search memories (hybrid retrieval)
+- `POST /api/v0/memories` - Store a new memory
+- `GET /api/v0/memories/search` - Search memories (hybrid retrieval, with JSON body)
+- `GET /api/v0/memories` - Get memories (with query params)
 
 ## Development
 
@@ -611,13 +1093,3 @@ echo '{"prompt":"How do I handle authentication?"}' | node hooks/scripts/inject-
 # Test memory save (requires transcript file)
 echo '{"transcript_path":"/path/to/transcript.json"}' | node hooks/scripts/store-memories.js
 ```
-
-## Links
-
-- **Console**: [console.evermind.ai](https://console.evermind.ai/)
-- **API Documentation**: [docs.evermind.ai](https://docs.evermind.ai)
-- **Issues**: [GitHub Issues](https://github.com/EverMind-AI/evermem-claude-code/issues)
-
-## License
-
-MIT

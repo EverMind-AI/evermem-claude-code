@@ -26,31 +26,18 @@
       flex-wrap: wrap;
     }
     #header h1 { font-size: 18px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
-    #header .stats {
-      font-size: 13px;
-      color: #8b949e;
-      margin-left: auto;
-    }
-    .header-controls {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .api-input, .search-input, .filter-select {
+    #header .stats { font-size: 13px; color: #8b949e; margin-left: auto; }
+    .header-controls { display: flex; align-items: center; gap: 8px; }
+    .api-input {
       padding: 6px 12px;
       background: #161b22;
       border: 1px solid #30363d;
       border-radius: 6px;
       color: #c9d1d9;
       font-size: 13px;
+      width: 200px;
     }
-    .api-input { width: 180px; }
-    .search-input { width: 200px; }
-    .filter-select { min-width: 120px; cursor: pointer; }
-    .api-input:focus, .search-input:focus, .filter-select:focus {
-      outline: none;
-      border-color: #FFC53D;
-    }
+    .api-input:focus { outline: none; border-color: #FFC53D; }
     .api-btn, .refresh-btn {
       padding: 6px 12px;
       background: #FFC53D;
@@ -61,42 +48,26 @@
       font-size: 13px;
       cursor: pointer;
       transition: background 0.2s;
-      display: flex;
-      align-items: center;
-      gap: 4px;
     }
-    .api-btn:hover, .refresh-btn:hover { background: #e6b038; }
-    .api-btn:disabled, .refresh-btn:disabled { background: #30363d; cursor: not-allowed; }
-    .refresh-btn { background: #30363d; }
+    .api-btn:hover { background: #e6b038; }
+    .api-btn:disabled { background: #30363d; cursor: not-allowed; }
+    .refresh-btn { background: #30363d; display: none; }
     .refresh-btn:hover { background: #3d444d; }
     .refresh-btn.spinning svg { animation: spin 1s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
 
-    #progress-view {
-      width: 100%;
-      padding: 24px;
-      overflow-y: auto;
-    }
-    .progress-container {
-      max-width: 1200px;
-      margin: 0 auto;
-    }
-    .loading-message {
-      text-align: center;
-      padding: 60px 20px;
-      color: #8b949e;
-      font-size: 14px;
-    }
-    .loading-message .spinner {
-      width: 32px;
-      height: 32px;
+    #main { padding: 24px; max-width: 1200px; margin: 0 auto; }
+
+    .loading { text-align: center; padding: 60px 20px; color: #8b949e; }
+    .loading .spinner {
+      width: 32px; height: 32px;
       border: 3px solid #30363d;
       border-top-color: #FFC53D;
       border-radius: 50%;
       animation: spin 1s linear infinite;
       margin: 0 auto 16px;
     }
-    @keyframes spin { to { transform: rotate(360deg); } }
-    .error-message {
+    .error {
       background: #f8514922;
       border: 1px solid #f85149;
       border-radius: 8px;
@@ -104,59 +75,180 @@
       color: #f85149;
       margin-bottom: 24px;
     }
+    .empty-state { text-align: center; padding: 60px 20px; color: #8b949e; }
+    .empty-state h3 { font-size: 18px; color: #f0f6fc; margin-bottom: 8px; }
+
+    /* Stats Grid */
     .stats-grid {
       display: grid;
-      grid-template-columns: repeat(4, 1fr);
+      grid-template-columns: repeat(5, 1fr);
       gap: 16px;
       margin-bottom: 32px;
     }
-    @media (max-width: 768px) {
-      .stats-grid { grid-template-columns: repeat(2, 1fr); }
-      #header { flex-direction: column; align-items: flex-start; }
-      .header-controls { flex-wrap: wrap; }
-    }
+    @media (max-width: 900px) { .stats-grid { grid-template-columns: repeat(3, 1fr); } }
+    @media (max-width: 600px) { .stats-grid { grid-template-columns: 1fr; } }
     .stat-card {
       background: #161b22;
       border: 1px solid #30363d;
       border-radius: 12px;
       padding: 20px;
     }
-    .stat-card .label {
-      font-size: 12px;
-      color: #8b949e;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      margin-bottom: 8px;
-    }
-    .stat-card .value {
-      font-size: 32px;
-      font-weight: 600;
-      color: #f0f6fc;
-    }
-    .stat-card .trend {
-      font-size: 12px;
-      color: #FFC53D;
-      margin-top: 4px;
-    }
-    .stat-card .trend.neutral { color: #8b949e; }
+    .stat-card .label { font-size: 12px; color: #8b949e; text-transform: uppercase; margin-bottom: 8px; }
+    .stat-card .value { font-size: 32px; font-weight: 600; color: #f0f6fc; }
+    .stat-card .sub { font-size: 12px; color: #FFC53D; margin-top: 4px; }
 
-    /* Heatmap - GitHub style */
-    .heatmap-section {
+    /* Groups Section */
+    .section-title { font-size: 16px; font-weight: 600; color: #f0f6fc; margin-bottom: 16px; }
+    .groups-container { display: flex; flex-direction: column; gap: 16px; }
+
+    /* Group Card */
+    .group-card {
       background: #161b22;
       border: 1px solid #30363d;
       border-radius: 12px;
-      padding: 24px;
-      margin-bottom: 32px;
-      overflow-x: auto;
+      overflow: hidden;
     }
-    .section-title {
-      font-size: 14px;
-      font-weight: 600;
-      color: #f0f6fc;
-      margin-bottom: 20px;
+    .group-header {
+      padding: 16px 20px;
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 12px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .group-header:hover { background: #1c2128; }
+    .group-icon { font-size: 24px; }
+    .group-info { flex: 1; min-width: 0; }
+    .group-name { font-size: 15px; font-weight: 600; color: #f0f6fc; margin-bottom: 4px; }
+    .group-path {
+      font-size: 11px;
+      color: #8b949e;
+      font-family: monospace;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .group-id {
+      font-size: 10px;
+      color: #6e7681;
+      font-family: monospace;
+      margin-top: 2px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .group-id-label {
+      color: #484f58;
+      margin-right: 4px;
+    }
+    .group-stats {
+      display: flex;
+      gap: 16px;
+      font-size: 12px;
+      color: #8b949e;
+    }
+    .group-stats span { display: flex; align-items: center; gap: 4px; }
+    .group-stats .count { color: #FFC53D; font-weight: 600; }
+    .group-expand {
+      width: 24px;
+      height: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #8b949e;
+      transition: transform 0.2s;
+    }
+    .group-card.expanded .group-expand { transform: rotate(180deg); }
+
+    /* Memories List */
+    .memories-container {
+      display: none;
+      border-top: 1px solid #30363d;
+      background: #0d1117;
+    }
+    .group-card.expanded .memories-container { display: block; }
+    .memories-loading { padding: 20px; text-align: center; color: #8b949e; }
+    .memories-list { padding: 12px; }
+
+    /* Timeline within group */
+    .group-timeline { padding: 16px 20px; }
+    .timeline-day-section { margin-bottom: 20px; }
+    .timeline-day-section:last-child { margin-bottom: 0; }
+    .timeline-day-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #21262d;
+    }
+    .timeline-day-dot {
+      width: 10px;
+      height: 10px;
+      background: #FFC53D;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .timeline-day-dot.today { box-shadow: 0 0 8px rgba(255, 197, 61, 0.6); }
+    .timeline-day-date { font-size: 13px; font-weight: 600; color: #f0f6fc; }
+    .timeline-day-badge {
+      font-size: 10px;
+      padding: 2px 8px;
+      background: #FFC53D22;
+      color: #FFC53D;
+      border-radius: 10px;
+    }
+    .timeline-day-count { font-size: 11px; color: #8b949e; margin-left: auto; }
+    .timeline-memories { display: flex; flex-direction: column; gap: 8px; padding-left: 22px; }
+
+    .memory-item {
+      padding: 12px 16px;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .memory-item:hover { border-color: #FFC53D; background: #161b22; }
+    .memory-header { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+    .memory-emoji { font-size: 14px; }
+    .memory-subject { font-size: 13px; font-weight: 500; color: #f0f6fc; flex: 1; }
+    .memory-time { font-size: 11px; color: #8b949e; }
+    .memory-preview { font-size: 12px; color: #8b949e; line-height: 1.5; max-height: 60px; overflow: hidden; }
+
+    .load-more {
+      padding: 12px 20px;
+      text-align: center;
+      border-top: 1px solid #21262d;
+    }
+    .load-more-btn {
+      padding: 8px 16px;
+      background: #21262d;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      color: #c9d1d9;
+      font-size: 13px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .load-more-btn:hover { background: #30363d; }
+    .load-more-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* Charts Row */
+    .charts-row {
+      display: flex;
+      gap: 24px;
+      margin-bottom: 32px;
+    }
+    @media (max-width: 900px) { .charts-row { flex-direction: column; } }
+
+    /* Heatmap - GitHub style */
+    .heatmap-section {
+      flex: 2;
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      padding: 20px;
+      overflow-x: auto;
     }
     .heatmap-months {
       position: relative;
@@ -166,13 +258,8 @@
       margin-left: 36px;
       height: 16px;
     }
-    .heatmap-months span {
-      position: absolute;
-    }
-    .heatmap-body {
-      display: flex;
-      gap: 4px;
-    }
+    .heatmap-months span { position: absolute; }
+    .heatmap-body { display: flex; gap: 4px; }
     .heatmap-days {
       display: flex;
       flex-direction: column;
@@ -181,19 +268,9 @@
       width: 32px;
       padding-top: 2px;
     }
-    .heatmap-days span {
-      height: 13px;
-      line-height: 13px;
-    }
-    .heatmap-grid {
-      display: flex;
-      gap: 3px;
-    }
-    .heatmap-week {
-      display: flex;
-      flex-direction: column;
-      gap: 3px;
-    }
+    .heatmap-days span { height: 13px; line-height: 13px; }
+    .heatmap-grid { display: flex; gap: 3px; }
+    .heatmap-week { display: flex; flex-direction: column; gap: 3px; }
     .heatmap-cell {
       width: 13px;
       height: 13px;
@@ -202,7 +279,6 @@
       border: 1px solid #21262d;
       cursor: pointer;
       transition: transform 0.1s;
-      position: relative;
     }
     .heatmap-cell:hover { transform: scale(1.3); z-index: 10; }
     .heatmap-cell.level-1 { background: #4d3a10; border-color: #4d3a10; }
@@ -223,9 +299,7 @@
       box-shadow: 0 4px 12px rgba(0,0,0,0.4);
       display: none;
     }
-    .heatmap-tooltip strong {
-      color: #f0f6fc;
-    }
+    .heatmap-tooltip strong { color: #f0f6fc; }
     .heatmap-legend {
       display: flex;
       align-items: center;
@@ -237,25 +311,10 @@
     }
     .heatmap-legend-cell { width: 12px; height: 12px; border-radius: 2px; }
 
-    .charts-row {
-      display: flex;
-      gap: 24px;
-      margin-bottom: 32px;
-    }
-    .charts-row .heatmap-section {
-      flex: 1;
-      margin-bottom: 0;
-    }
-    .charts-row .growth-section {
+    /* Growth Chart */
+    .growth-section {
       flex: 1;
       min-width: 280px;
-    }
-    @media (max-width: 900px) {
-      .charts-row {
-        flex-direction: column;
-      }
-    }
-    .growth-section {
       background: #161b22;
       border: 1px solid #30363d;
       border-radius: 12px;
@@ -309,122 +368,10 @@
     .chart-bar:hover .bar-tooltip { opacity: 1; }
     .chart-label { font-size: 10px; color: #8b949e; margin-top: 8px; }
 
-    .timeline-section { margin-bottom: 32px; }
-    .timeline { position: relative; padding-left: 32px; }
-    .timeline::before {
-      content: '';
-      position: absolute;
-      left: 7px;
-      top: 0;
-      bottom: 0;
-      width: 2px;
-      background: #30363d;
-    }
-    .timeline-day { position: relative; margin-bottom: 24px; }
-    .timeline-day:last-child { margin-bottom: 0; }
-    .timeline-day.hidden { display: none; }
-    .timeline-dot {
-      position: absolute;
-      left: -32px;
-      top: 4px;
-      width: 16px;
-      height: 16px;
-      background: #FFC53D;
-      border: 3px solid #0d1117;
-      border-radius: 50%;
-      z-index: 1;
-    }
-    .timeline-dot.today {
-      background: #FFC53D;
-      box-shadow: 0 0 12px rgba(255, 197, 61, 0.5);
-    }
-    .timeline-dot.highlighted {
-      background: #fff;
-      box-shadow: 0 0 12px rgba(255, 255, 255, 0.6);
-    }
-    .day-header { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
-    .day-date { font-size: 14px; font-weight: 600; color: #f0f6fc; }
-    .day-badge {
-      font-size: 11px;
-      padding: 2px 8px;
-      background: #FFC53D22;
-      color: #FFC53D;
-      border-radius: 10px;
-    }
-    .day-stats { font-size: 12px; color: #8b949e; }
-    .memory-cards {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-      gap: 12px;
-    }
-    .memory-card {
-      background: #0d1117;
-      border: 1px solid #30363d;
-      border-radius: 8px;
-      padding: 14px;
-      transition: border-color 0.2s, transform 0.2s;
-      cursor: pointer;
-    }
-    .memory-card:hover { border-color: #FFC53D; transform: translateY(-2px); }
-    .memory-card.hidden { display: none; }
-    .memory-card-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
-    .memory-emoji { font-size: 16px; flex-shrink: 0; }
-    .memory-label { font-size: 13px; font-weight: 500; color: #f0f6fc; flex: 1; }
-    .memory-time { font-size: 11px; color: #8b949e; }
-    .memory-project {
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      font-size: 10px;
-      color: #8b949e;
-      margin-bottom: 8px;
-      font-family: monospace;
-      background: #21262d;
-      padding: 3px 8px;
-      border-radius: 12px;
-      max-width: 100%;
-    }
-    .memory-project::before {
-      content: '📁';
-      font-size: 10px;
-    }
-    .memory-project span {
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-    .memory-content {
-      font-size: 12px;
-      color: #8b949e;
-      line-height: 1.5;
-      max-height: 100px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    .empty-state {
-      text-align: center;
-      padding: 60px 20px;
-      color: #8b949e;
-    }
-    .empty-state h3 {
-      font-size: 18px;
-      color: #f0f6fc;
-      margin-bottom: 8px;
-    }
-    .no-results {
-      text-align: center;
-      padding: 40px 20px;
-      color: #8b949e;
-      font-size: 14px;
-    }
-
     /* Modal */
     .modal-overlay {
       position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
+      top: 0; left: 0; right: 0; bottom: 0;
       background: rgba(0, 0, 0, 0.7);
       display: flex;
       align-items: center;
@@ -434,10 +381,7 @@
       visibility: hidden;
       transition: opacity 0.2s, visibility 0.2s;
     }
-    .modal-overlay.visible {
-      opacity: 1;
-      visibility: visible;
-    }
+    .modal-overlay.visible { opacity: 1; visibility: visible; }
     .modal {
       background: #161b22;
       border: 1px solid #30363d;
@@ -451,9 +395,7 @@
       transform: scale(0.95);
       transition: transform 0.2s;
     }
-    .modal-overlay.visible .modal {
-      transform: scale(1);
-    }
+    .modal-overlay.visible .modal { transform: scale(1); }
     .modal-header {
       padding: 16px 20px;
       border-bottom: 1px solid #30363d;
@@ -462,16 +404,8 @@
       gap: 12px;
     }
     .modal-header-content { flex: 1; }
-    .modal-title {
-      font-size: 16px;
-      font-weight: 600;
-      color: #f0f6fc;
-      margin-bottom: 4px;
-    }
-    .modal-meta {
-      font-size: 12px;
-      color: #8b949e;
-    }
+    .modal-title { font-size: 16px; font-weight: 600; color: #f0f6fc; margin-bottom: 4px; }
+    .modal-meta { font-size: 12px; color: #8b949e; }
     .modal-close {
       background: none;
       border: none;
@@ -479,74 +413,10 @@
       cursor: pointer;
       padding: 4px;
       border-radius: 4px;
-      transition: color 0.2s, background 0.2s;
     }
-    .modal-close:hover {
-      color: #f0f6fc;
-      background: #30363d;
-    }
-    .modal-body {
-      padding: 20px;
-      overflow-y: auto;
-      flex: 1;
-    }
-    .modal-content {
-      font-size: 14px;
-      color: #c9d1d9;
-      line-height: 1.7;
-      white-space: pre-wrap;
-    }
-
-    /* Conversation display in modal */
-    .conversation-container {
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-    }
-    .conversation-message {
-      padding: 12px 16px;
-      border-radius: 8px;
-      background: #0d1117;
-      border: 1px solid #30363d;
-    }
-    .conversation-message.user {
-      border-left: 3px solid #FFC53D;
-    }
-    .conversation-message.assistant {
-      border-left: 3px solid #FFC53D;
-    }
-    .conversation-header {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin-bottom: 8px;
-      font-size: 12px;
-    }
-    .conversation-speaker {
-      font-weight: 600;
-      color: #f0f6fc;
-    }
-    .conversation-speaker.user { color: #FFC53D; }
-    .conversation-speaker.assistant { color: #FFC53D; }
-    .conversation-time {
-      color: #8b949e;
-    }
-    .conversation-text {
-      font-size: 13px;
-      color: #c9d1d9;
-      line-height: 1.6;
-      white-space: pre-wrap;
-    }
-    .modal-section-title {
-      font-size: 12px;
-      font-weight: 600;
-      color: #8b949e;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      margin-bottom: 12px;
-      padding-bottom: 8px;
-      border-bottom: 1px solid #30363d;
-    }
+    .modal-close:hover { color: #f0f6fc; background: #30363d; }
+    .modal-body { padding: 20px; overflow-y: auto; flex: 1; }
+    .modal-content { font-size: 14px; color: #c9d1d9; line-height: 1.7; white-space: pre-wrap; }
   </style>
 </head>
 <body>
@@ -558,8 +428,8 @@
     <div class="header-controls">
       <label style="font-size: 12px; color: #8b949e;">API Key:</label>
       <input type="password" id="api-key-input" class="api-input" placeholder="Enter your EverMem API key" />
-      <button id="load-btn" class="api-btn" onclick="loadData()">Load</button>
-      <button id="refresh-btn" class="refresh-btn" onclick="refreshData()" title="Refresh" style="display: none;">
+      <button id="load-btn" class="api-btn" onclick="loadGroups()">Load</button>
+      <button id="refresh-btn" class="refresh-btn" onclick="refreshAll()" title="Refresh">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M23 4v6h-6M1 20v-6h6"/>
           <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
@@ -569,18 +439,16 @@
     <span class="stats" id="stats">Enter API key to load memories</span>
   </div>
 
-  <div id="progress-view">
-    <div class="progress-container">
-      <div id="content">
-        <div class="empty-state">
-          <h3>Welcome to EverMem Memory Hub</h3>
-          <p>Enter your EverMem API key above to view your memory statistics and timeline.</p>
-        </div>
+  <div id="main">
+    <div id="content">
+      <div class="empty-state">
+        <h3>Welcome to EverMem Memory Hub</h3>
+        <p>Enter your EverMem API key above to view your memories by project.</p>
       </div>
     </div>
   </div>
 
-  <!-- Modal for full memory view -->
+  <!-- Modal -->
   <div id="modal-overlay" class="modal-overlay" onclick="closeModal(event)">
     <div class="modal" onclick="event.stopPropagation()">
       <div class="modal-header">
@@ -602,51 +470,46 @@
 
   <script>
     const PROXY_URL = window.location.protocol === 'file:' ? 'http://localhost:3456' : '';
-    let memories = [];
-    let filteredMemories = [];
-    let apiKey = '';
-    let proxyAvailable = false;
+    const MEMORIES_PER_PAGE = 100;
 
+    let apiKey = '';
+    let groups = [];
+    let groupMemories = {}; // { groupId: { memories: [], totalCount: 0, hasMore: false, page: 1 } }
+
+    // Get API key from URL
     const urlParams = new URLSearchParams(window.location.search);
     const hashParams = new URLSearchParams(window.location.hash.slice(1));
-    const keyFromUrl = urlParams.get('key') || urlParams.get('apiKey') || hashParams.get('key') || hashParams.get('apiKey');
+    const keyFromUrl = urlParams.get('key') || urlParams.get('apiKey') || hashParams.get('key');
 
-    async function checkProxy() {
-      try {
-        const response = await fetch(`${PROXY_URL}/health`, { method: 'GET' });
-        proxyAvailable = response.ok;
-      } catch {
-        proxyAvailable = false;
-      }
-
-      if (!proxyAvailable) {
-        document.getElementById('content').innerHTML = `
-          <div class="error-message">
-            <strong>Server not running</strong>
-            <p style="margin-top: 8px; color: #c9d1d9;">The Memory Hub requires a local server to communicate with the EverMind API.</p>
-            <p style="margin-top: 8px; color: #8b949e;">Start the server with:</p>
-            <pre style="margin-top: 8px; padding: 12px; background: #0d1117; border-radius: 6px; font-family: monospace; color: #FFC53D;">node server/proxy.js</pre>
-            <p style="margin-top: 8px; color: #8b949e;">Then refresh this page.</p>
-          </div>
-        `;
-        document.getElementById('load-btn').disabled = true;
-        return;
-      }
+    // Initialize
+    async function init() {
+      const healthOk = await checkProxy();
+      if (!healthOk) return;
 
       if (keyFromUrl) {
         document.getElementById('api-key-input').value = keyFromUrl;
-        setTimeout(() => loadData(), 100);
+        setTimeout(() => loadGroups(), 100);
       }
     }
 
-    checkProxy();
+    async function checkProxy() {
+      try {
+        const response = await fetch(`${PROXY_URL}/health`);
+        if (response.ok) return true;
+      } catch {}
 
-    async function loadData() {
-      if (!proxyAvailable) {
-        alert('Server not running. Please start it first.');
-        return;
-      }
+      document.getElementById('content').innerHTML = `
+        <div class="error">
+          <strong>Server not running</strong>
+          <p style="margin-top: 8px; color: #c9d1d9;">Start the server with:</p>
+          <pre style="margin-top: 8px; padding: 12px; background: #0d1117; border-radius: 6px; font-family: monospace; color: #FFC53D;">node server/proxy.js</pre>
+        </div>
+      `;
+      document.getElementById('load-btn').disabled = true;
+      return false;
+    }
 
+    async function loadGroups() {
       apiKey = document.getElementById('api-key-input').value.trim();
       if (!apiKey) {
         alert('Please enter an API key');
@@ -658,12 +521,70 @@
       loadBtn.textContent = 'Loading...';
 
       document.getElementById('content').innerHTML = `
-        <div class="loading-message">
+        <div class="loading">
           <div class="spinner"></div>
-          <p>Loading memories from EverMem Cloud...</p>
+          <p>Loading your projects...</p>
         </div>
       `;
 
+      try {
+        // 1. Fetch groups from local storage
+        const groupsResponse = await fetch(`${PROXY_URL}/api/groups`, {
+          headers: { 'Authorization': `Bearer ${apiKey}` }
+        });
+
+        if (!groupsResponse.ok) {
+          throw new Error('Failed to fetch groups');
+        }
+
+        const groupsData = await groupsResponse.json();
+        groups = groupsData.groups || [];
+
+        if (groups.length === 0) {
+          document.getElementById('content').innerHTML = `
+            <div class="empty-state">
+              <h3>No Projects Found</h3>
+              <p>No projects have been tracked yet for this API key.</p>
+              <p style="margin-top: 12px; color: #8b949e;">Use Claude Code with EverMem to start saving memories.</p>
+            </div>
+          `;
+          document.getElementById('stats').textContent = '0 projects';
+          return;
+        }
+
+        // 2. For each group, fetch first page of memories
+        groupMemories = {};
+        let totalMemories = 0;
+
+        await Promise.all(groups.map(async (group) => {
+          const data = await fetchMemoriesForGroup(group.id, 1, MEMORIES_PER_PAGE);
+          groupMemories[group.id] = {
+            memories: data.memories,
+            totalCount: data.totalCount,
+            hasMore: data.hasMore,
+            page: 2  // Next page to load
+          };
+          totalMemories += data.totalCount;
+        }));
+
+        // 3. Render dashboard
+        document.getElementById('refresh-btn').style.display = 'flex';
+        document.getElementById('stats').textContent = `${totalMemories} memories across ${groups.length} projects`;
+        renderDashboard(totalMemories);
+
+      } catch (error) {
+        document.getElementById('content').innerHTML = `
+          <div class="error">
+            <strong>Error:</strong> ${error.message}
+          </div>
+        `;
+      } finally {
+        loadBtn.disabled = false;
+        loadBtn.textContent = 'Load';
+      }
+    }
+
+    async function fetchMemoriesForGroup(groupId, page, pageSize) {
       try {
         const response = await fetch(`${PROXY_URL}/api/v0/memories`, {
           method: 'POST',
@@ -673,149 +594,90 @@
           },
           body: JSON.stringify({
             user_id: 'claude-code-user',
+            group_ids: [groupId],
             memory_type: 'episodic_memory',
-            limit: 500,
-            offset: 0
+            page: page,
+            page_size: pageSize
           })
         });
 
         if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          throw new Error(errorData.message || `API error: ${response.status} ${response.statusText}`);
+          throw new Error(`API error: ${response.status}`);
         }
 
         const data = await response.json();
-        memories = transformApiResponse(data);
-        filteredMemories = [...memories];
+        const result = data.result || {};
 
-        if (memories.length === 0) {
-          document.getElementById('content').innerHTML = `
-            <div class="empty-state">
-              <h3>No Memories Found</h3>
-              <p>Your EverMem account doesn't have any memories yet. Start using Claude Code with the EverMem plugin to build your memory.</p>
-            </div>
-          `;
-          document.getElementById('stats').textContent = '0 memories';
-        } else {
-          // Show refresh button
-          document.getElementById('refresh-btn').style.display = 'flex';
-          renderDashboard();
-          populateProjectFilter();
-        }
+        return {
+          memories: (result.memories || []).map(transformMemory),
+          totalCount: result.total_count || 0,
+          hasMore: result.has_more || false
+        };
       } catch (error) {
-        document.getElementById('content').innerHTML = `
-          <div class="error-message">
-            <strong>Error loading memories:</strong> ${error.message}
-          </div>
-          <div class="empty-state">
-            <p>Please check your API key and try again.</p>
-          </div>
-        `;
-      } finally {
-        loadBtn.disabled = false;
-        loadBtn.textContent = 'Load';
+        console.error(`Error fetching memories for ${groupId}:`, error);
+        return { memories: [], totalCount: 0, hasMore: false };
       }
     }
 
-    async function refreshData() {
-      const refreshBtn = document.getElementById('refresh-btn');
-      refreshBtn.classList.add('spinning');
-      refreshBtn.disabled = true;
-      await loadData();
-      refreshBtn.classList.remove('spinning');
-      refreshBtn.disabled = false;
+    function transformMemory(mem) {
+      const timestamp = mem.timestamp || mem.create_time || new Date().toISOString();
+      const date = new Date(timestamp);
+
+      return {
+        id: mem.id || mem.message_id,
+        content: mem.episode || mem.content || '',
+        subject: mem.subject || '',
+        groupId: mem.group_id || '',
+        timestamp: timestamp,
+        date: formatLocalDate(date),
+        time: date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+        summary: mem.summary || ''
+      };
     }
 
-    function populateProjectFilter() {
-      const select = document.getElementById('project-filter');
-      const groups = new Set();
-      memories.forEach(m => { if (m.groupId) groups.add(m.groupId); });
+    function renderDashboard(totalMemories) {
+      const activeGroups = groups.filter(g => groupMemories[g.id]?.totalCount > 0).length;
 
-      select.innerHTML = '<option value="">All Projects</option>';
-      groups.forEach(g => {
-        const displayName = g.replace(/^claude-code:/, '');
-        const option = document.createElement('option');
-        option.value = g;
-        option.textContent = displayName.length > 40 ? '...' + displayName.slice(-40) : displayName;
-        select.appendChild(option);
-      });
-    }
-
-    function filterMemories() {
-      const searchTerm = document.getElementById('search-input').value.toLowerCase();
-      const projectFilter = document.getElementById('project-filter').value;
-
-      filteredMemories = memories.filter(m => {
-        const matchesSearch = !searchTerm ||
-          m.content.toLowerCase().includes(searchTerm) ||
-          m.subject.toLowerCase().includes(searchTerm);
-        const matchesProject = !projectFilter || m.groupId === projectFilter;
-        return matchesSearch && matchesProject;
+      // Collect all memories for charts
+      const allMemories = [];
+      for (const gm of Object.values(groupMemories)) {
+        allMemories.push(...gm.memories);
+      }
+      const memoriesByDate = {};
+      allMemories.forEach(mem => {
+        memoriesByDate[mem.date] = (memoriesByDate[mem.date] || 0) + 1;
       });
 
-      renderTimeline();
-      updateStats();
-    }
+      // Calculate active days and average
+      const activeDays = Object.keys(memoriesByDate).length;
+      const avgPerDay = activeDays > 0 ? (totalMemories / activeDays).toFixed(1) : 0;
 
-    function updateStats() {
-      const showing = filteredMemories.length;
-      const total = memories.length;
-      const suffix = showing === total ? '' : ` (showing ${showing})`;
-      document.getElementById('stats').textContent =
-        `${total} memories${suffix} | Last updated: ${new Date().toLocaleTimeString()}`;
-    }
-
-    function transformApiResponse(apiResponse) {
-      if (!apiResponse?.result?.memories) return [];
-
-      const memoryList = apiResponse.result.memories || [];
-      const scores = apiResponse.result.scores || [];
-
-      return memoryList.map((mem, i) => {
-        const timestamp = mem.timestamp || mem.create_time || new Date().toISOString();
-        const date = new Date(timestamp);
-
-        return {
-          id: mem.id || mem.message_id || `mem_${i}`,
-          content: mem.episode || mem.content || '',
-          subject: mem.subject || '',
-          groupId: mem.group_id || '',
-          participants: mem.participants || [],
-          timestamp: timestamp,
-          date: formatLocalDate(date),
-          time: date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
-          score: scores[i] || 0,
-          memoryType: mem.memory_type,
-          summary: mem.summary || ''
-        };
-      }).filter(m => m.content);
-    }
-
-    function renderDashboard() {
-      const stats = calculateStats();
-      updateStats();
-
-      document.getElementById('content').innerHTML = `
+      let html = `
         <div class="stats-grid">
           <div class="stat-card">
             <div class="label">Total Memories</div>
-            <div class="value">${stats.totalMemories}</div>
-            <div class="trend">${stats.memoriesThisWeek > 0 ? `+${stats.memoriesThisWeek} this week` : 'No new this week'}</div>
+            <div class="value">${totalMemories}</div>
+            <div class="sub">Across all projects</div>
           </div>
           <div class="stat-card">
             <div class="label">Projects</div>
-            <div class="value">${stats.uniqueGroups}</div>
-            <div class="trend neutral">Unique workspaces</div>
+            <div class="value">${groups.length}</div>
+            <div class="sub">${activeGroups} with memories</div>
           </div>
           <div class="stat-card">
             <div class="label">Active Days</div>
-            <div class="value">${stats.activeDays}</div>
-            <div class="trend neutral">Streak: ${stats.currentStreak} ${stats.currentStreak === 1 ? 'day' : 'days'}</div>
+            <div class="value">${activeDays}</div>
+            <div class="sub">Days with memories</div>
           </div>
           <div class="stat-card">
             <div class="label">Avg / Day</div>
-            <div class="value">${stats.avgPerDay}</div>
-            <div class="trend neutral">Memories per active day</div>
+            <div class="value">${avgPerDay}</div>
+            <div class="sub">Memories per active day</div>
+          </div>
+          <div class="stat-card">
+            <div class="label">Avg / Project</div>
+            <div class="value">${activeGroups > 0 ? Math.round(totalMemories / activeGroups) : 0}</div>
+            <div class="sub">Memories per project</div>
           </div>
         </div>
 
@@ -825,13 +687,7 @@
             <div class="heatmap-months" id="heatmap-months"></div>
             <div class="heatmap-body">
               <div class="heatmap-days">
-                <span></span>
-                <span>Mon</span>
-                <span></span>
-                <span>Wed</span>
-                <span></span>
-                <span>Fri</span>
-                <span></span>
+                <span></span><span>Mon</span><span></span><span>Wed</span><span></span><span>Fri</span><span></span>
               </div>
               <div class="heatmap-grid" id="heatmap"></div>
             </div>
@@ -845,7 +701,6 @@
               <span>More</span>
             </div>
           </div>
-
           <div class="growth-section">
             <div class="section-title">Last 7 Days</div>
             <div class="growth-chart" id="growth-chart"></div>
@@ -853,83 +708,44 @@
         </div>
         <div class="heatmap-tooltip" id="heatmap-tooltip"></div>
 
-        <div class="timeline-section">
-          <div class="section-title" style="margin-bottom: 16px;">Daily Memory Timeline</div>
-          <div class="timeline-filters" style="display: flex; gap: 12px; margin-bottom: 20px;">
-            <input type="text" id="search-input" class="search-input" placeholder="Search memories..." style="flex: 1; max-width: 300px;" oninput="filterMemories()" />
-            <select id="project-filter" class="filter-select" onchange="filterMemories()">
-              <option value="">All Projects</option>
-            </select>
-          </div>
-          <div class="timeline" id="timeline"></div>
-        </div>
+        <div class="section-title">Your Projects</div>
+        <div class="groups-container">
       `;
 
-      buildHeatmap(stats.memoriesByDate);
-      buildGrowthChart(stats.memoriesByDate);
-      buildTimeline();
-    }
+      window._memoriesByDate = memoriesByDate;
 
-    function calculateStats() {
-      const now = new Date();
-      const oneWeekAgo = new Date(now);
-      oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-
-      const memoriesByDate = {};
-      const uniqueGroups = new Set();
-      let memoriesThisWeek = 0;
-
-      memories.forEach(mem => {
-        memoriesByDate[mem.date] = (memoriesByDate[mem.date] || 0) + 1;
-        if (mem.groupId) uniqueGroups.add(mem.groupId);
-
-        const memDate = new Date(mem.date);
-        if (memDate >= oneWeekAgo) memoriesThisWeek++;
+      // Sort groups by memory count (descending)
+      const sortedGroups = [...groups].sort((a, b) => {
+        const countA = groupMemories[a.id]?.totalCount || 0;
+        const countB = groupMemories[b.id]?.totalCount || 0;
+        return countB - countA;
       });
 
-      let currentStreak = 0;
-      const todayStr = formatLocalDate(now);
-      let checkDate = new Date(now);
-
-      while (true) {
-        const dateStr = formatLocalDate(checkDate);
-        if (memoriesByDate[dateStr]) {
-          currentStreak++;
-          checkDate.setDate(checkDate.getDate() - 1);
-        } else if (dateStr !== todayStr) {
-          break;
-        } else {
-          checkDate.setDate(checkDate.getDate() - 1);
-        }
+      for (const group of sortedGroups) {
+        const gm = groupMemories[group.id] || { memories: [], totalCount: 0, hasMore: false };
+        html += renderGroupCard(group, gm);
       }
 
-      const activeDays = Object.keys(memoriesByDate).length;
-      const avgPerDay = activeDays > 0 ? (memories.length / activeDays).toFixed(1) : 0;
+      html += '</div>';
+      document.getElementById('content').innerHTML = html;
 
-      return {
-        totalMemories: memories.length,
-        uniqueGroups: uniqueGroups.size,
-        activeDays,
-        avgPerDay,
-        memoriesThisWeek,
-        currentStreak,
-        memoriesByDate
-      };
+      // Build charts after rendering
+      buildHeatmap(window._memoriesByDate);
+      buildGrowthChart(window._memoriesByDate);
     }
 
     function buildHeatmap(memoriesByDate) {
       const heatmapContainer = document.getElementById('heatmap');
       const monthsContainer = document.getElementById('heatmap-months');
-      const today = new Date();
+      if (!heatmapContainer) return;
 
-      // Find the Sunday ~6 months ago (26 weeks)
+      const today = new Date();
       const startDate = new Date(today);
       startDate.setDate(startDate.getDate() - 182);
       while (startDate.getDay() !== 0) {
         startDate.setDate(startDate.getDate() - 1);
       }
 
-      // Build weeks (columns)
       const weeks = [];
       let currentWeek = [];
       const months = new Map();
@@ -939,7 +755,6 @@
         const dateStr = formatLocalDate(currentDate);
         const monthKey = currentDate.toLocaleDateString('en-US', { month: 'short' });
 
-        // Track first occurrence of each month
         if (!months.has(monthKey)) {
           months.set(monthKey, weeks.length);
         }
@@ -964,8 +779,7 @@
 
       // Render month labels
       monthsContainer.innerHTML = '';
-      const weekWidth = 16; // 13px cell + 3px gap
-
+      const weekWidth = 16;
       months.forEach((weekIndex, monthName) => {
         const span = document.createElement('span');
         span.textContent = monthName;
@@ -973,19 +787,18 @@
         monthsContainer.appendChild(span);
       });
 
-      // Calculate dynamic thresholds based on max count (quartiles)
+      // Calculate thresholds
       const maxCount = Math.max(...Object.values(memoriesByDate), 1);
       const q1 = Math.max(1, Math.ceil(maxCount * 0.25));
       const q2 = Math.max(2, Math.ceil(maxCount * 0.5));
       const q3 = Math.max(3, Math.ceil(maxCount * 0.75));
 
-      // Render weeks (columns)
+      // Render weeks
       heatmapContainer.innerHTML = '';
       weeks.forEach((week, weekIndex) => {
         const weekDiv = document.createElement('div');
         weekDiv.className = 'heatmap-week';
 
-        // Pad first week if it doesn't start on Sunday
         if (weekIndex === 0 && week[0].dayOfWeek !== 0) {
           for (let i = 0; i < week[0].dayOfWeek; i++) {
             const emptyCell = document.createElement('div');
@@ -1008,11 +821,9 @@
 
           cell.addEventListener('mouseenter', showHeatmapTooltip);
           cell.addEventListener('mouseleave', hideHeatmapTooltip);
-          cell.addEventListener('click', () => scrollToDay(day.date));
           weekDiv.appendChild(cell);
         });
 
-        // Pad last week if it doesn't end on Saturday
         if (weekIndex === weeks.length - 1 && week[week.length - 1].dayOfWeek !== 6) {
           for (let i = week[week.length - 1].dayOfWeek + 1; i <= 6; i++) {
             const emptyCell = document.createElement('div');
@@ -1032,20 +843,14 @@
       const date = cell.dataset.date;
       const count = parseInt(cell.dataset.count);
 
-      // Format date nicely
       const dateObj = new Date(date + 'T12:00:00');
       const formattedDate = dateObj.toLocaleDateString('en-US', {
-        weekday: 'short',
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric'
+        weekday: 'short', month: 'short', day: 'numeric', year: 'numeric'
       });
 
-      const memoryText = count === 1 ? 'memory' : 'memories';
-      tooltip.innerHTML = `<strong>${count} ${memoryText}</strong> on ${formattedDate}`;
+      tooltip.innerHTML = `<strong>${count} ${count === 1 ? 'memory' : 'memories'}</strong> on ${formattedDate}`;
       tooltip.style.display = 'block';
 
-      // Position tooltip near cursor
       const rect = cell.getBoundingClientRect();
       tooltip.style.left = `${rect.left + rect.width / 2}px`;
       tooltip.style.top = `${rect.top - 40}px`;
@@ -1053,48 +858,27 @@
     }
 
     function hideHeatmapTooltip() {
-      const tooltip = document.getElementById('heatmap-tooltip');
-      tooltip.style.display = 'none';
-    }
-
-    function scrollToDay(dateStr) {
-      const dayEl = document.querySelector(`.timeline-day[data-date="${dateStr}"]`);
-      if (dayEl) {
-        // Remove previous highlight
-        document.querySelectorAll('.timeline-dot.highlighted').forEach(el => {
-          el.classList.remove('highlighted');
-        });
-
-        // Scroll to day
-        dayEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-
-        // Highlight the dot
-        const dot = dayEl.querySelector('.timeline-dot');
-        if (dot) {
-          dot.classList.add('highlighted');
-          setTimeout(() => dot.classList.remove('highlighted'), 2000);
-        }
-      }
+      document.getElementById('heatmap-tooltip').style.display = 'none';
     }
 
     function buildGrowthChart(memoriesByDate) {
       const chartContainer = document.getElementById('growth-chart');
-      const today = new Date();
+      if (!chartContainer) return;
 
+      const today = new Date();
       const dailyData = [];
+
       for (let i = 6; i >= 0; i--) {
         const date = new Date(today);
         date.setDate(date.getDate() - i);
         const dateStr = formatLocalDate(date);
         const dayName = date.toLocaleDateString('en-US', { weekday: 'short' });
-        dailyData.push({
-          date: dayName,
-          count: memoriesByDate[dateStr] || 0
-        });
+        dailyData.push({ date: dayName, count: memoriesByDate[dateStr] || 0 });
       }
 
       const maxCount = Math.max(...dailyData.map(d => d.count), 1);
 
+      chartContainer.innerHTML = '';
       dailyData.forEach(day => {
         const barContainer = document.createElement('div');
         barContainer.className = 'chart-bar-container';
@@ -1123,92 +907,168 @@
       });
     }
 
-    function buildTimeline() {
-      renderTimeline();
+    function renderGroupCard(group, gm) {
+      const memCount = gm.totalCount;
+      const hasMemories = memCount > 0;
+
+      return `
+        <div class="group-card" id="group-${encodeId(group.id)}" data-group-id="${escapeHtml(group.id)}">
+          <div class="group-header" onclick="toggleGroup('${escapeHtml(group.id)}')">
+            <span class="group-icon">📁</span>
+            <div class="group-info">
+              <div class="group-name">${escapeHtml(group.name)}</div>
+              <div class="group-path">${escapeHtml(group.path)}</div>
+              <div class="group-id"><span class="group-id-label">ID:</span>${escapeHtml(group.id)}</div>
+            </div>
+            <div class="group-stats">
+              <span><span class="count">${memCount}</span> memories</span>
+              <span>${group.sessionCount} sessions</span>
+            </div>
+            ${hasMemories ? `
+              <div class="group-expand">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M6 9l6 6 6-6"/>
+                </svg>
+              </div>
+            ` : ''}
+          </div>
+          ${hasMemories ? `
+            <div class="memories-container" id="memories-${encodeId(group.id)}">
+              ${renderMemoriesList(group.id, gm)}
+            </div>
+          ` : ''}
+        </div>
+      `;
     }
 
-    function renderTimeline() {
-      const timelineContainer = document.getElementById('timeline');
-      if (!timelineContainer) return;
+    function renderMemoriesList(groupId, gm) {
+      if (gm.memories.length === 0) {
+        return '<div class="memories-loading">No memories yet</div>';
+      }
 
+      // Group memories by date
       const byDate = {};
-      filteredMemories.forEach(mem => {
+      gm.memories.forEach(mem => {
         if (!byDate[mem.date]) byDate[mem.date] = [];
         byDate[mem.date].push(mem);
       });
 
-      const dates = Object.keys(byDate).sort().reverse();
+      // Sort dates descending (most recent first)
+      const sortedDates = Object.keys(byDate).sort().reverse();
       const todayStr = formatLocalDate(new Date());
 
-      if (dates.length === 0) {
-        timelineContainer.innerHTML = '<div class="no-results">No memories match your search.</div>';
-        return;
-      }
+      let html = '<div class="group-timeline">';
 
-      timelineContainer.innerHTML = '';
-
-      dates.forEach(date => {
-        const dayMemories = byDate[date].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-        const dayDiv = document.createElement('div');
-        dayDiv.className = 'timeline-day';
-        dayDiv.dataset.date = date;
-
-        const dot = document.createElement('div');
-        dot.className = 'timeline-dot' + (date === todayStr ? ' today' : '');
-        dayDiv.appendChild(dot);
-
-        const header = document.createElement('div');
-        header.className = 'day-header';
+      for (const date of sortedDates) {
+        const dayMemories = byDate[date].sort((a, b) =>
+          new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+        );
+        const isToday = date === todayStr;
 
         const dateDisplay = new Date(date + 'T12:00:00').toLocaleDateString('en-US', {
-          weekday: 'long', month: 'short', day: 'numeric'
+          weekday: 'short', month: 'short', day: 'numeric'
         });
 
-        header.innerHTML = `
-          <span class="day-date">${dateDisplay}</span>
-          ${date === todayStr ? '<span class="day-badge">Today</span>' : ''}
-          <span class="day-stats">${dayMemories.length} ${dayMemories.length === 1 ? 'memory' : 'memories'}</span>
-        `;
-        dayDiv.appendChild(header);
-
-        const cardsDiv = document.createElement('div');
-        cardsDiv.className = 'memory-cards';
-
-        dayMemories.forEach(memory => {
-          const card = document.createElement('div');
-          card.className = 'memory-card';
-          card.onclick = () => openModal(memory);
-
-          const displaySubject = memory.subject || (memory.content.length > 40 ? memory.content.slice(0, 40) + '...' : memory.content);
-          const displayContent = memory.content.length > 150 ? memory.content.slice(0, 150) + '...' : memory.content;
-          const projectName = memory.groupId ? memory.groupId.replace(/^claude-code:/, '') : '';
-          const emoji = getEmojiForContent(memory.subject || memory.content);
-
-          card.innerHTML = `
-            <div class="memory-card-header">
-              <span class="memory-emoji">${emoji}</span>
-              <span class="memory-label">${escapeHtml(displaySubject)}</span>
-              <span class="memory-time">${memory.time}</span>
+        html += `
+          <div class="timeline-day-section">
+            <div class="timeline-day-header">
+              <div class="timeline-day-dot${isToday ? ' today' : ''}"></div>
+              <span class="timeline-day-date">${dateDisplay}</span>
+              ${isToday ? '<span class="timeline-day-badge">Today</span>' : ''}
+              <span class="timeline-day-count">${dayMemories.length} ${dayMemories.length === 1 ? 'memory' : 'memories'}</span>
             </div>
-            ${projectName ? `<div class="memory-project"><span>${escapeHtml(projectName)}</span></div>` : ''}
-            <div class="memory-content">${escapeHtml(displayContent)}</div>
-          `;
-          cardsDiv.appendChild(card);
-        });
+            <div class="timeline-memories">
+        `;
 
-        dayDiv.appendChild(cardsDiv);
-        timelineContainer.appendChild(dayDiv);
-      });
+        for (const mem of dayMemories) {
+          const emoji = getEmojiForContent(mem.subject || mem.content);
+          const displaySubject = mem.subject || (mem.content.length > 50 ? mem.content.slice(0, 50) + '...' : mem.content);
+          const preview = mem.content.length > 120 ? mem.content.slice(0, 120) + '...' : mem.content;
+
+          html += `
+            <div class="memory-item" onclick='openModal(${JSON.stringify(mem).replace(/'/g, "&#39;")})'>
+              <div class="memory-header">
+                <span class="memory-emoji">${emoji}</span>
+                <span class="memory-subject">${escapeHtml(displaySubject)}</span>
+                <span class="memory-time">${mem.time}</span>
+              </div>
+              <div class="memory-preview">${escapeHtml(preview)}</div>
+            </div>
+          `;
+        }
+
+        html += '</div></div>';
+      }
+
+      html += '</div>';
+
+      // Load more button
+      if (gm.hasMore) {
+        html += `
+          <div class="load-more">
+            <button class="load-more-btn" onclick="loadMoreMemories('${escapeHtml(groupId)}')">
+              Load more (${gm.totalCount - gm.memories.length} remaining)
+            </button>
+          </div>
+        `;
+      }
+
+      return html;
+    }
+
+    function toggleGroup(groupId) {
+      const card = document.getElementById(`group-${encodeId(groupId)}`);
+      if (!card) return;
+
+      const gm = groupMemories[groupId];
+      if (!gm || gm.totalCount === 0) return;
+
+      card.classList.toggle('expanded');
+    }
+
+    async function loadMoreMemories(groupId) {
+      const gm = groupMemories[groupId];
+      if (!gm || !gm.hasMore) return;
+
+      const btn = event.target;
+      btn.disabled = true;
+      btn.textContent = 'Loading...';
+
+      try {
+        const data = await fetchMemoriesForGroup(groupId, gm.page, MEMORIES_PER_PAGE);
+
+        gm.memories = [...gm.memories, ...data.memories];
+        gm.hasMore = data.hasMore;
+        gm.page += 1;
+
+        // Re-render just this group's memories
+        const container = document.getElementById(`memories-${encodeId(groupId)}`);
+        if (container) {
+          container.innerHTML = renderMemoriesList(groupId, gm);
+        }
+      } catch (error) {
+        alert('Failed to load more memories: ' + error.message);
+        btn.disabled = false;
+        btn.textContent = 'Load more';
+      }
+    }
+
+    async function refreshAll() {
+      const btn = document.getElementById('refresh-btn');
+      btn.classList.add('spinning');
+      btn.disabled = true;
+      await loadGroups();
+      btn.classList.remove('spinning');
+      btn.disabled = false;
     }
 
     function openModal(memory) {
-      const projectName = memory.groupId ? memory.groupId.replace(/^claude-code:/, '') : '';
       const dateStr = new Date(memory.timestamp).toLocaleDateString('en-US', {
         weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
       });
 
       document.getElementById('modal-title').textContent = memory.subject || 'Memory';
-      document.getElementById('modal-meta').innerHTML = `${dateStr}${projectName ? ` · <span style="font-family: monospace;">${escapeHtml(projectName)}</span>` : ''}`;
+      document.getElementById('modal-meta').textContent = dateStr;
       document.getElementById('modal-content').textContent = memory.content;
 
       document.getElementById('modal-overlay').classList.add('visible');
@@ -1225,187 +1085,30 @@
       if (e.key === 'Escape') closeModal();
     });
 
-    // Keyword to emoji mapping (checked in order, first match wins)
+    // Helpers
+    function encodeId(str) {
+      return btoa(str).replace(/[+/=]/g, c => ({ '+': '-', '/': '_', '=': '' }[c]));
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    function formatLocalDate(date) {
+      return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    }
+
+    // Emoji mapping (simplified)
     const emojiKeywords = [
-      // Programming Actions
-      ['debug', '🐛'], ['bug', '🐛'], ['fix', '🔧'], ['repair', '🔧'], ['patch', '🩹'],
-      ['error', '❌'], ['fail', '❌'], ['crash', '💥'], ['broken', '💔'],
-      ['test', '🧪'], ['spec', '🧪'], ['jest', '🧪'], ['mocha', '🧪'], ['pytest', '🧪'],
-      ['add', '➕'], ['create', '✨'], ['new', '🆕'], ['implement', '🛠️'],
-      ['remove', '🗑️'], ['delete', '🗑️'], ['clean', '🧹'], ['prune', '✂️'],
-      ['update', '✏️'], ['change', '📝'], ['modify', '🔄'], ['edit', '✏️'],
-      ['refactor', '♻️'], ['rewrite', '♻️'], ['restructure', '🏗️'],
-      ['optimize', '⚡'], ['performance', '🚀'], ['speed', '💨'], ['fast', '⚡'],
-      ['merge', '🔀'], ['rebase', '🔀'], ['cherry-pick', '🍒'],
-      ['deploy', '🚀'], ['release', '📦'], ['publish', '📤'], ['ship', '🚢'],
-      ['rollback', '⏪'], ['revert', '↩️'], ['undo', '↩️'],
-      ['install', '📥'], ['setup', '🔧'], ['configure', '⚙️'], ['init', '🎬'],
-      ['upgrade', '⬆️'], ['downgrade', '⬇️'], ['migrate', '🚚'],
-      ['build', '🏗️'], ['compile', '⚙️'], ['bundle', '📦'],
-      ['lint', '🧹'], ['format', '💅'], ['prettier', '💅'], ['eslint', '🧹'],
-      ['commit', '📝'], ['push', '📤'], ['pull', '📥'], ['fetch', '📡'],
-      ['branch', '🌿'], ['checkout', '🔀'], ['stash', '📦'],
-
-      // Programming Concepts
-      ['api', '🔌'], ['endpoint', '🎯'], ['route', '🛤️'], ['rest', '🔌'], ['graphql', '◼️'],
-      ['database', '🗄️'], ['db', '🗄️'], ['sql', '🗄️'], ['query', '🔍'], ['schema', '📋'],
-      ['mongo', '🍃'], ['postgres', '🐘'], ['mysql', '🐬'], ['redis', '🔴'], ['sqlite', '📁'],
-      ['auth', '🔐'], ['login', '🔑'], ['logout', '🚪'], ['password', '🔒'], ['token', '🎟️'],
-      ['oauth', '🔐'], ['jwt', '🎫'], ['session', '🎫'], ['cookie', '🍪'],
-      ['cache', '💾'], ['memory', '🧠'], ['storage', '💽'], ['store', '🏪'],
-      ['queue', '📬'], ['job', '⚙️'], ['worker', '👷'], ['cron', '⏰'], ['schedule', '📅'],
-      ['webhook', '🪝'], ['callback', '📞'], ['event', '📡'], ['listener', '👂'],
-      ['middleware', '🔗'], ['plugin', '🔌'], ['extension', '🧩'], ['module', '📦'],
-      ['component', '🧩'], ['widget', '🎛️'], ['element', '🔲'],
-      ['state', '📊'], ['redux', '💜'], ['context', '🌐'], ['props', '📨'],
-      ['hook', '🪝'], ['effect', '✨'], ['ref', '👉'], ['memo', '📝'],
-      ['async', '⏳'], ['await', '⏳'], ['promise', '🤝'], ['callback', '📞'],
-      ['thread', '🧵'], ['process', '⚙️'], ['parallel', '⏸️'], ['concurrent', '🔄'],
-      ['socket', '🔌'], ['websocket', '🌐'], ['stream', '🌊'], ['pipe', '🚰'],
-      ['encryption', '🔐'], ['decrypt', '🔓'], ['hash', '#️⃣'], ['salt', '🧂'],
-      ['validate', '✅'], ['sanitize', '🧼'], ['escape', '🏃'], ['encode', '🔢'],
-      ['parse', '📖'], ['serialize', '📝'], ['json', '{}'], ['xml', '📄'], ['yaml', '📋'],
-      ['regex', '🔤'], ['pattern', '🎨'], ['match', '🎯'], ['search', '🔍'], ['find', '🔎'],
-      ['sort', '📊'], ['filter', '🔍'], ['map', '🗺️'], ['reduce', '📉'], ['loop', '🔁'],
-      ['array', '📚'], ['list', '📝'], ['object', '📦'], ['class', '🏛️'], ['function', '⚡'],
-      ['variable', '📌'], ['constant', '🔒'], ['type', '🏷️'], ['interface', '📐'],
-      ['import', '📥'], ['export', '📤'], ['require', '📦'], ['dependency', '🔗'],
-      ['exception', '⚠️'], ['throw', '🎯'], ['catch', '🥅'], ['try', '🎲'],
-      ['log', '📋'], ['console', '🖥️'], ['print', '🖨️'], ['debug', '🐛'], ['trace', '👣'],
-
-      // Languages & Frameworks
-      ['javascript', '💛'], ['js', '💛'], ['typescript', '💙'], ['ts', '💙'],
-      ['python', '🐍'], ['py', '🐍'], ['ruby', '💎'], ['rb', '💎'],
-      ['java', '☕'], ['kotlin', '🟣'], ['scala', '🔴'], ['groovy', '🎸'],
-      ['go', '🐹'], ['golang', '🐹'], ['rust', '🦀'], ['swift', '🦅'],
-      ['php', '🐘'], ['laravel', '🔴'], ['symfony', '⚫'],
-      ['csharp', '💜'], ['c#', '💜'], ['dotnet', '💜'], ['.net', '💜'],
-      ['cpp', '🔵'], ['c++', '🔵'], ['c lang', '©️'],
-      ['html', '🌐'], ['css', '🎨'], ['sass', '💗'], ['less', '🔵'], ['tailwind', '🌊'],
-      ['react', '⚛️'], ['vue', '💚'], ['angular', '🅰️'], ['svelte', '🧡'],
-      ['next', '▲'], ['nuxt', '💚'], ['gatsby', '💜'], ['remix', '💿'],
-      ['node', '💚'], ['express', '⚡'], ['fastify', '🚀'], ['nest', '🐱'],
-      ['deno', '🦕'], ['bun', '🥟'],
-      ['django', '🎸'], ['flask', '🌶️'], ['fastapi', '⚡'],
-      ['rails', '🛤️'], ['sinatra', '🎤'],
-      ['spring', '🌱'], ['hibernate', '🐻'],
-      ['electron', '⚡'], ['tauri', '🦀'],
-      ['flutter', '🦋'], ['dart', '🎯'], ['react native', '📱'],
-      ['unity', '🎮'], ['unreal', '🎮'], ['godot', '🤖'],
-
-      // Tools & Services
-      ['docker', '🐳'], ['container', '📦'], ['kubernetes', '☸️'], ['k8s', '☸️'],
-      ['git', '📚'], ['github', '🐙'], ['gitlab', '🦊'], ['bitbucket', '🪣'],
-      ['npm', '📦'], ['yarn', '🧶'], ['pnpm', '📦'], ['pip', '📦'], ['cargo', '📦'],
-      ['webpack', '📦'], ['vite', '⚡'], ['rollup', '📜'], ['esbuild', '⚡'], ['parcel', '📦'],
-      ['babel', '🔄'], ['swc', '⚡'], ['tsc', '💙'],
-      ['aws', '☁️'], ['azure', '☁️'], ['gcp', '☁️'], ['cloud', '☁️'],
-      ['s3', '🪣'], ['ec2', '🖥️'], ['lambda', 'λ'], ['serverless', '⚡'],
-      ['vercel', '▲'], ['netlify', '🔷'], ['heroku', '💜'], ['railway', '🚂'],
-      ['firebase', '🔥'], ['supabase', '⚡'], ['planetscale', '🪐'],
-      ['nginx', '🟩'], ['apache', '🪶'], ['caddy', '🔒'],
-      ['linux', '🐧'], ['ubuntu', '🟠'], ['debian', '🔴'], ['macos', '🍎'], ['windows', '🪟'],
-      ['vim', '💚'], ['neovim', '💚'], ['emacs', '💜'], ['vscode', '💙'], ['ide', '🖥️'],
-      ['terminal', '💻'], ['bash', '💲'], ['zsh', '🐚'], ['shell', '🐚'], ['cli', '💻'],
-      ['postman', '📮'], ['insomnia', '😴'], ['curl', '🌀'],
-      ['figma', '🎨'], ['sketch', '💎'], ['photoshop', '🖼️'], ['illustrator', '✏️'],
-      ['slack', '💬'], ['discord', '💬'], ['teams', '👥'], ['zoom', '📹'],
-      ['jira', '📋'], ['trello', '📋'], ['notion', '📝'], ['asana', '📋'],
-      ['sentry', '🔍'], ['datadog', '🐕'], ['grafana', '📊'], ['prometheus', '🔥'],
-
-      // File Types
-      ['image', '🖼️'], ['photo', '📷'], ['picture', '🖼️'], ['png', '🖼️'], ['jpg', '🖼️'], ['svg', '🎨'],
-      ['video', '🎬'], ['movie', '🎥'], ['mp4', '🎬'], ['stream', '📺'],
-      ['audio', '🎵'], ['music', '🎶'], ['sound', '🔊'], ['mp3', '🎵'],
-      ['document', '📄'], ['pdf', '📕'], ['doc', '📄'], ['txt', '📝'],
-      ['spreadsheet', '📊'], ['excel', '📊'], ['csv', '📊'],
-      ['archive', '🗜️'], ['zip', '🗜️'], ['tar', '🗜️'], ['compress', '🗜️'],
-      ['font', '🔤'], ['icon', '🔣'], ['emoji', '😀'],
-
-      // UI/UX
-      ['button', '🔘'], ['input', '📝'], ['form', '📋'], ['field', '📝'],
-      ['modal', '🪟'], ['dialog', '💬'], ['popup', '🪟'], ['toast', '🍞'],
-      ['menu', '📋'], ['dropdown', '⬇️'], ['select', '📋'], ['option', '☑️'],
-      ['table', '📊'], ['grid', '📊'], ['list', '📝'], ['card', '🃏'],
-      ['nav', '🧭'], ['header', '📰'], ['footer', '👟'], ['sidebar', '📑'],
-      ['tab', '📑'], ['accordion', '🪗'], ['carousel', '🎠'], ['slider', '🎚️'],
-      ['chart', '📈'], ['graph', '📊'], ['pie', '🥧'], ['bar', '📊'],
-      ['loading', '⏳'], ['spinner', '🔄'], ['skeleton', '💀'], ['progress', '📶'],
-      ['scroll', '📜'], ['pagination', '📖'], ['infinite', '♾️'],
-      ['responsive', '📱'], ['mobile', '📱'], ['tablet', '📱'], ['desktop', '🖥️'],
-      ['dark mode', '🌙'], ['light mode', '☀️'], ['theme', '🎨'], ['style', '💅'],
-      ['animation', '🎬'], ['transition', '✨'], ['hover', '👆'], ['focus', '🎯'],
-      ['accessibility', '♿'], ['a11y', '♿'], ['aria', '♿'], ['screen reader', '🔊'],
-
-      // Development Process
-      ['review', '👀'], ['pr', '🔀'], ['pull request', '🔀'], ['code review', '👀'],
-      ['issue', '🎫'], ['ticket', '🎫'], ['task', '✅'], ['todo', '📋'],
-      ['sprint', '🏃'], ['agile', '🔄'], ['scrum', '🏈'], ['kanban', '📋'],
-      ['meeting', '📅'], ['standup', '🧍'], ['retro', '🔙'], ['planning', '📝'],
-      ['estimate', '🎯'], ['story', '📖'], ['epic', '📚'], ['backlog', '📋'],
-      ['milestone', '🏁'], ['deadline', '⏰'], ['release', '🎉'], ['version', '🏷️'],
-      ['documentation', '📚'], ['docs', '📖'], ['readme', '📖'], ['wiki', '📚'],
-      ['tutorial', '📚'], ['guide', '🗺️'], ['example', '💡'], ['demo', '🎪'],
-      ['comment', '💬'], ['note', '📝'], ['annotation', '🏷️'],
-
-      // Security
-      ['security', '🛡️'], ['secure', '🔒'], ['vulnerability', '⚠️'], ['exploit', '🔓'],
-      ['firewall', '🧱'], ['ddos', '💥'], ['attack', '⚔️'], ['protect', '🛡️'],
-      ['permission', '🔑'], ['role', '👤'], ['access', '🚪'], ['deny', '🚫'],
-      ['audit', '📋'], ['compliance', '✅'], ['gdpr', '🇪🇺'], ['privacy', '👁️'],
-      ['backup', '💾'], ['restore', '🔄'], ['recovery', '🔙'], ['disaster', '🆘'],
-      ['ssl', '🔒'], ['tls', '🔒'], ['https', '🔒'], ['certificate', '📜'],
-
-      // Data & Analytics
-      ['data', '📊'], ['analytics', '📈'], ['metrics', '📉'], ['stats', '📊'],
-      ['report', '📑'], ['dashboard', '📊'], ['insight', '💡'], ['trend', '📈'],
-      ['machine learning', '🤖'], ['ml', '🤖'], ['ai', '🤖'], ['model', '🧠'],
-      ['training', '🏋️'], ['dataset', '📚'], ['feature', '🎯'], ['prediction', '🔮'],
-      ['algorithm', '🧮'], ['neural', '🧠'], ['deep learning', '🧠'],
-
-      // Communication
-      ['email', '📧'], ['mail', '📬'], ['message', '💬'], ['chat', '💬'],
-      ['notification', '🔔'], ['alert', '🚨'], ['reminder', '⏰'], ['announce', '📢'],
-      ['feedback', '💭'], ['survey', '📋'], ['poll', '🗳️'], ['vote', '✋'],
-      ['support', '🆘'], ['help', '❓'], ['faq', '❔'], ['question', '❓'],
-
-      // Business
-      ['user', '👤'], ['customer', '👥'], ['client', '🤝'], ['account', '👤'],
-      ['profile', '👤'], ['avatar', '🖼️'], ['settings', '⚙️'], ['preferences', '🎛️'],
-      ['payment', '💳'], ['billing', '💰'], ['invoice', '🧾'], ['subscription', '📅'],
-      ['cart', '🛒'], ['checkout', '💳'], ['order', '📦'], ['shipping', '🚚'],
-      ['product', '📦'], ['inventory', '📦'], ['stock', '📊'], ['catalog', '📚'],
-      ['discount', '🏷️'], ['coupon', '🎟️'], ['promo', '🎉'], ['sale', '💸'],
-
-      // General
-      ['success', '✅'], ['complete', '✅'], ['done', '✅'], ['finish', '🏁'],
-      ['warning', '⚠️'], ['caution', '⚠️'], ['attention', '⚠️'],
-      ['info', 'ℹ️'], ['information', 'ℹ️'], ['detail', '📋'],
-      ['important', '❗'], ['critical', '🚨'], ['urgent', '🔴'], ['priority', '🔝'],
-      ['start', '▶️'], ['begin', '🎬'], ['init', '🎬'], ['launch', '🚀'],
-      ['stop', '⏹️'], ['end', '🔚'], ['close', '🔒'], ['shutdown', '🔌'],
-      ['pause', '⏸️'], ['resume', '▶️'], ['continue', '➡️'],
-      ['save', '💾'], ['load', '📂'], ['open', '📂'], ['read', '📖'], ['write', '✍️'],
-      ['copy', '📋'], ['paste', '📋'], ['cut', '✂️'], ['move', '🚚'],
-      ['link', '🔗'], ['url', '🔗'], ['redirect', '↪️'], ['navigate', '🧭'],
-      ['share', '📤'], ['embed', '📎'], ['attach', '📎'], ['upload', '⬆️'], ['download', '⬇️'],
-      ['sync', '🔄'], ['refresh', '🔃'], ['reload', '🔄'], ['reset', '🔄'],
-      ['enable', '✅'], ['disable', '❌'], ['toggle', '🔀'], ['switch', '🔀'],
-      ['show', '👁️'], ['hide', '🙈'], ['visible', '👀'], ['invisible', '👻'],
-      ['expand', '➕'], ['collapse', '➖'], ['zoom', '🔍'], ['fullscreen', '⛶'],
-      ['lock', '🔒'], ['unlock', '🔓'], ['block', '🚫'], ['allow', '✅'],
-      ['approve', '✅'], ['reject', '❌'], ['accept', '✅'], ['decline', '❌'],
-      ['like', '👍'], ['dislike', '👎'], ['favorite', '⭐'], ['bookmark', '🔖'],
-      ['follow', '👣'], ['unfollow', '🚫'], ['subscribe', '🔔'], ['unsubscribe', '🔕'],
-      ['online', '🟢'], ['offline', '🔴'], ['away', '🟡'], ['busy', '🔴'],
-      ['connect', '🔗'], ['disconnect', '🔌'], ['network', '🌐'], ['internet', '🌍'],
-      ['local', '🏠'], ['remote', '🌐'], ['server', '🖥️'], ['client', '💻'],
-      ['input', '📥'], ['output', '📤'], ['result', '📊'], ['response', '💬'],
-      ['request', '📨'], ['send', '📤'], ['receive', '📥'], ['transfer', '🔄'],
-      ['time', '⏰'], ['date', '📅'], ['schedule', '📅'], ['calendar', '📆'],
-      ['morning', '🌅'], ['afternoon', '☀️'], ['evening', '🌆'], ['night', '🌙'],
-      ['today', '📅'], ['yesterday', '⏮️'], ['tomorrow', '⏭️'], ['week', '📅'],
-      ['month', '📅'], ['year', '📅'], ['hour', '🕐'], ['minute', '⏱️'],
+      ['debug', '🐛'], ['bug', '🐛'], ['fix', '🔧'], ['error', '❌'],
+      ['test', '🧪'], ['add', '➕'], ['create', '✨'], ['new', '🆕'],
+      ['remove', '🗑️'], ['delete', '🗑️'], ['update', '✏️'], ['change', '📝'],
+      ['refactor', '♻️'], ['optimize', '⚡'], ['deploy', '🚀'], ['release', '📦'],
+      ['api', '🔌'], ['database', '🗄️'], ['auth', '🔐'], ['security', '🛡️'],
+      ['ui', '🎨'], ['style', '💅'], ['docs', '📖'], ['config', '⚙️'],
+      ['build', '🏗️'], ['merge', '🔀'], ['review', '👀'], ['commit', '📝'],
     ];
 
     function getEmojiForContent(text) {
@@ -1417,16 +1120,8 @@
       return '💭';
     }
 
-    function escapeHtml(text) {
-      const div = document.createElement('div');
-      div.textContent = text;
-      return div.innerHTML;
-    }
-
-    // Format date as YYYY-MM-DD using local timezone
-    function formatLocalDate(date) {
-      return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-    }
+    // Start
+    init();
   </script>
 </body>
 </html>

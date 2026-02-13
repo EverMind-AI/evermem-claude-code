@@ -1,6 +1,8 @@
 # PRD files (internal only)
 *-prd.md
-
+groups.jsonl
+sessions.jsonl
+*.jsonl
 # Dependencies
 node_modules/
 

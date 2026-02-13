@@ -1,6 +1,6 @@
 {
   "name": "evermem",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Automatically recalls relevant memories from past sessions and injects them into Claude's context",
   "author": {
     "name": "EverMem"
