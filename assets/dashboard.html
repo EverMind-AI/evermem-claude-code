@@ -540,32 +540,42 @@
         const groupsData = await groupsResponse.json();
         groups = groupsData.groups || [];
 
-        if (groups.length === 0) {
-          document.getElementById('content').innerHTML = `
-            <div class="empty-state">
-              <h3>No Projects Found</h3>
-              <p>No projects have been tracked yet for this API key.</p>
-              <p style="margin-top: 12px; color: #8b949e;">Use Claude Code with EverMem to start saving memories.</p>
-            </div>
-          `;
-          document.getElementById('stats').textContent = '0 projects';
-          return;
-        }
-
-        // 2. For each group, fetch first page of memories
+        // 2. Fetch memories - by group if available, or all at once
         groupMemories = {};
         let totalMemories = 0;
 
-        await Promise.all(groups.map(async (group) => {
-          const data = await fetchMemoriesForGroup(group.id, 1, MEMORIES_PER_PAGE);
-          groupMemories[group.id] = {
-            memories: data.memories,
-            totalCount: data.totalCount,
-            hasMore: data.hasMore,
-            page: 2  // Next page to load
-          };
-          totalMemories += data.totalCount;
-        }));
+        if (groups.length === 0) {
+          // No local groups tracked yet - fetch all memories and auto-discover groups
+          const allMems = await fetchAllMemories();
+          const discoveredGroups = new Map();
+
+          allMems.forEach(mem => {
+            const gid = mem.groupId || 'ungrouped';
+            if (!discoveredGroups.has(gid)) {
+              discoveredGroups.set(gid, { id: gid, name: gid.split('/').pop() || gid, path: gid, sessionCount: 0 });
+            }
+            if (!groupMemories[gid]) {
+              groupMemories[gid] = { memories: [], totalCount: 0, hasMore: false, page: 1 };
+            }
+            groupMemories[gid].memories.push(mem);
+            groupMemories[gid].totalCount++;
+          });
+
+          groups = Array.from(discoveredGroups.values());
+          totalMemories = allMems.length;
+        } else {
+          // Fetch per group with pagination
+          await Promise.all(groups.map(async (group) => {
+            const data = await fetchMemoriesForGroup(group.id, 1, MEMORIES_PER_PAGE);
+            groupMemories[group.id] = {
+              memories: data.memories,
+              totalCount: data.totalCount,
+              hasMore: data.hasMore,
+              page: 2  // Next page to load
+            };
+            totalMemories += data.totalCount;
+          }));
+        }
 
         // 3. Render dashboard
         document.getElementById('refresh-btn').style.display = 'flex';
@@ -582,6 +592,39 @@
         loadBtn.disabled = false;
         loadBtn.textContent = 'Load';
       }
+    }
+
+    async function fetchAllMemories() {
+      let allMemories = [];
+      let page = 1;
+      let hasMore = true;
+
+      while (hasMore) {
+        const response = await fetch(`${PROXY_URL}/api/v0/memories`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            user_id: 'claude-code-user',
+            memory_type: 'episodic_memory',
+            page_size: 100,
+            page: page
+          })
+        });
+
+        if (!response.ok) break;
+
+        const data = await response.json();
+        const pageMemories = (data.result?.memories || []).map(transformMemory);
+        allMemories = allMemories.concat(pageMemories);
+
+        hasMore = pageMemories.length >= 100;
+        page++;
+      }
+
+      return allMemories;
     }
 
     async function fetchMemoriesForGroup(groupId, page, pageSize) {
