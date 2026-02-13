@@ -77,7 +77,7 @@ Run `/evermem:help` to check if the plugin is configured correctly.
 | `/evermem:ask <question>` | Ask about past work (combines memory + context) |
 | `/evermem:hub` | Open the Memory Hub dashboard |
 | `/evermem:debug` | View debug logs for troubleshooting |
-| `/evermem:groups` | View tracked projects/memory groups |
+| `/evermem:projects` | View your Claude Code projects table |
 
 ### Automatic Behavior
 
@@ -599,7 +599,7 @@ The SessionStart hook automatically records project groups to `data/groups.jsonl
 
 **Deduplication:** Each `keyId + groupId` combination is stored only once (no duplicates).
 
-View tracked groups with `/evermem:groups` command.
+View tracked projects with `/evermem:projects` command.
 
 ## Stop Hook: Conversation Flow
 
@@ -1037,7 +1037,7 @@ evermem-plugin/
 │   ├── search.md             # /evermem:search command
 │   ├── hub.md                # /evermem:hub command
 │   ├── debug.md              # /evermem:debug command
-│   └── groups.md             # /evermem:groups command
+│   └── projects.md           # /evermem:projects command
 ├── data/
 │   ├── groups.jsonl          # Local storage for tracked projects (JSONL format)
 │   └── sessions.jsonl        # Local storage for session summaries (JSONL format)
