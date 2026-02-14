@@ -10,9 +10,6 @@ import { readFileSync, appendFileSync, existsSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { getGroupId, getConfig } from './utils/config.js';
-import { debug, setDebugPrefix } from './utils/debug.js';
-
-setDebugPrefix('session-end');
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SESSIONS_FILE = resolve(__dirname, '../../data/sessions.jsonl');
@@ -31,8 +28,7 @@ function extractTranscriptContent(transcriptPath) {
     const content = readFileSync(transcriptPath, 'utf8');
     const lines = content.trim().split('\n').filter(Boolean);
 
-    let firstUserPrompt = null;
-    let lastUserPrompt = null;
+    const userPrompts = [];  // Collect all valid user prompts
     let turnCount = 0;
     let firstTimestamp = null;
     let lastTimestamp = null;
@@ -52,22 +48,40 @@ function extractTranscriptContent(transcriptPath) {
           turnCount++;
         }
 
-        // Extract user messages (not tool_result)
+        // Extract user messages (not tool_result, not system tags)
         if (entry.type === 'user' && entry.message?.role === 'user') {
           const msgContent = entry.message.content;
           if (typeof msgContent === 'string' && msgContent.trim()) {
-            if (!firstUserPrompt) {
-              firstUserPrompt = msgContent.trim();
+            const trimmed = msgContent.trim();
+            // Skip system-generated content (various XML-like tags)
+            if (trimmed.startsWith('<local-command-') ||
+                trimmed.startsWith('<system-reminder>') ||
+                trimmed.startsWith('<command-name>') ||
+                trimmed.startsWith('<local-command-caveat>') ||
+                trimmed === 'No response requested.') {
+              continue;
             }
-            lastUserPrompt = msgContent.trim();
+            // Collect unique prompts (skip duplicates and very short ones)
+            if (trimmed.length > 3 && !userPrompts.includes(trimmed)) {
+              userPrompts.push(trimmed);
+            }
           }
         }
       } catch {}
     }
 
+    // Build summary from multiple prompts
+    // Take first 5 prompts, truncate each to 50 chars, join with " | "
+    const MAX_PROMPTS = 5;
+    const MAX_CHARS_PER_PROMPT = 50;
+    const selectedPrompts = userPrompts.slice(0, MAX_PROMPTS).map(p =>
+      p.length > MAX_CHARS_PER_PROMPT ? p.substring(0, MAX_CHARS_PER_PROMPT) + '...' : p
+    );
+    const combinedSummary = selectedPrompts.join(' | ') || 'Session with no text prompts';
+
     return {
-      firstUserPrompt: firstUserPrompt?.substring(0, 200) || '',
-      lastUserPrompt: lastUserPrompt?.substring(0, 200) || '',
+      summary: combinedSummary.substring(0, 300),  // Max 300 chars total
+      promptCount: userPrompts.length,
       turnCount,
       firstTimestamp,
       lastTimestamp
@@ -144,8 +158,8 @@ async function main() {
     process.exit(0);
   }
 
-  // Use first user prompt as summary (truncated)
-  const summary = content.firstUserPrompt || 'Session with no text prompts';
+  // Use combined summary from multiple user prompts
+  const summary = content.summary;
 
   // Calculate session duration
   let durationStr = '';
@@ -163,9 +177,9 @@ async function main() {
     }
   }
 
-  // Truncate summary for display
-  const displaySummary = summary.length > 50
-    ? summary.substring(0, 50) + '...'
+  // Truncate summary for display (show first 80 chars)
+  const displaySummary = summary.length > 80
+    ? summary.substring(0, 80) + '...'
     : summary;
 
   // Build output: turns, duration, summary
@@ -187,11 +201,12 @@ async function main() {
     saveSummary(entry);
   }
 
+  // Note: SessionEnd no longer sends memory to cloud
+  // This was removed because flush=true forces MemoryCell creation,
+  // which consumes quota too quickly (free tier: 100 cells)
+
   // Always output session summary (whether saved or not)
   const message = `📝 Session (${parts.join(', ')}): "${displaySummary}"`;
-
-  // Log to unified debug file
-  debug('output', message);
 
   console.error(message);  // Direct terminal output
   console.log(JSON.stringify({ systemMessage: message }));

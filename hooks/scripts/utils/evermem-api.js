@@ -3,28 +3,55 @@
  * Handles memory search and storage operations
  */
 
-import { getConfig } from './config.js';
-import { appendFileSync } from 'fs';
-import { homedir } from 'os';
-import { join } from 'path';
-import { execSync } from 'child_process';
-import { debug, setDebugPrefix } from './debug.js';
+import { getConfig, getKeyId } from './config.js';
+import https from 'https';
+import http from 'http';
 
-// Set debug prefix for this script
-setDebugPrefix('EverMemAPI');
-const TIMEOUT_MS = 30000; // 30 seconds
-const DEBUG = process.env.EVERMEM_DEBUG === '1';
-const LOG_FILE = join(homedir(), '.evermem-debug.log');
+/**
+ * Make HTTP/HTTPS request with body (supports GET with body)
+ * @param {string} url - Full URL
+ * @param {Object} options - Request options (method, headers)
+ * @param {string} body - Request body
+ * @param {number} timeout - Timeout in ms
+ * @returns {Promise<{status: number, data: Object}>}
+ */
+function httpRequest(url, options, body, timeout = 30000) {
+  return new Promise((resolve, reject) => {
+    const urlObj = new URL(url);
+    const client = urlObj.protocol === 'https:' ? https : http;
 
-function debugLog(msg, data = null) {
-  if (!DEBUG) return;
-  const timestamp = new Date().toISOString();
-  let line = `[${timestamp}] [API] ${msg}`;
-  if (data !== null) {
-    line += `: ${typeof data === 'string' ? data : JSON.stringify(data, null, 2)}`;
-  }
-  appendFileSync(LOG_FILE, line + '\n');
+    // Add Content-Length header if body is provided
+    if (body) {
+      options.headers = options.headers || {};
+      options.headers['Content-Length'] = Buffer.byteLength(body);
+    }
+
+    const req = client.request(urlObj, options, (res) => {
+      let data = '';
+      res.on('data', chunk => { data += chunk; });
+      res.on('end', () => {
+        try {
+          resolve({ status: res.statusCode, data: JSON.parse(data) });
+        } catch {
+          resolve({ status: res.statusCode, data: { raw: data } });
+        }
+      });
+    });
+
+    req.on('error', reject);
+    req.setTimeout(timeout, () => {
+      req.destroy();
+      reject(new Error(`Request timeout after ${timeout}ms`));
+    });
+
+    if (body) {
+      req.write(body);
+    }
+    req.end();
+  });
 }
+
+const TIMEOUT_MS = 30000; // 30 seconds
 
 /**
  * Search memories from EverMem Cloud
@@ -56,6 +83,7 @@ export async function searchMemories(query, options = {}) {
       query,
       retrieve_method: retrieveMethod,
       top_k: topK,
+      radius: 0.1,  // Server-side similarity threshold (local MIN_SCORE provides double filtering)
       include_metadata: true,
       memory_types: memoryTypes
     };
@@ -66,38 +94,26 @@ export async function searchMemories(query, options = {}) {
     if (config.groupId) {
       requestBody.group_ids = [config.groupId];
     }
-    debug('searchMemories request body', requestBody);
     clearTimeout(timeoutId);
 
-    // Use curl since Node.js fetch doesn't support GET with body
-    // Escape single quotes in JSON for shell safety: ' -> '\''
-    const jsonBody = JSON.stringify(requestBody).replace(/'/g, "'\\''");
-    const curlCmd = `curl -s -X GET "${config.apiBaseUrl}/api/v0/memories/search" -H "Authorization: Bearer ${config.apiKey}" -H "Content-Type: application/json" -d '${jsonBody}'`;
+    // Use native https module (supports GET with body, no shell injection risk)
+    const url = `${config.apiBaseUrl}/api/v0/memories/search`;
+    const jsonBody = JSON.stringify(requestBody);
 
-    // Return debug info along with result
-    let result, data;
-    try {
-      result = execSync(curlCmd, { timeout: TIMEOUT_MS, encoding: 'utf8' });
-      data = JSON.parse(result);
-    } catch (e) {
-      // Return error info for debugging
-      return {
-        _debug: {
-          curl: curlCmd.replace(config.apiKey, 'API_KEY_HIDDEN'),
-          requestBody,
-          error: e.message,
-          stdout: e.stdout?.toString(),
-          stderr: e.stderr?.toString()
+      try {
+      const { status, data } = await httpRequest(url, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${config.apiKey}`,
+          'Content-Type': 'application/json'
         }
-      };
-    }
+      }, jsonBody, TIMEOUT_MS);
 
-    // Attach debug info to response
-    data._debug = {
-      curl: curlCmd.replace(config.apiKey, 'API_KEY_HIDDEN'),
-      requestBody
-    };
-    return data;
+      return data;
+    } catch (e) {
+      // Return empty result on error
+      return { error: e.message };
+    }
   } catch (error) {
     clearTimeout(timeoutId);
 
@@ -121,7 +137,6 @@ export function transformSearchResults(apiResponse) {
   const memories = [];
   const result = apiResponse.result;
   const memoryList = result.memories || [];
-
   // API returns: memories[].episode for content, memories[].subject for title, memories[].score for relevance
   for (let i = 0; i < memoryList.length; i++) {
     const mem = memoryList[i];
@@ -156,7 +171,9 @@ export function transformSearchResults(apiResponse) {
  * @param {Object} message - Message to store
  * @param {string} message.content - Message content
  * @param {string} message.role - 'user' or 'assistant'
- * @param {string} message.messageId - Unique message ID
+ * @param {string} [message.messageId] - Unique message ID (auto-generated if not provided)
+ * @param {string} [message.senderName] - Custom sender name (default: 'User' or 'Claude')
+ * @param {boolean} [message.flush] - Force memory extraction (for session end)
  * @returns {Promise<Object>} API response
  */
 export async function addMemory(message) {
@@ -171,12 +188,16 @@ export async function addMemory(message) {
     message_id: message.messageId || generateMessageId(),
     create_time: new Date().toISOString(),
     sender: message.role === 'assistant' ? 'claude-assistant' : config.userId,
-    sender_name: message.role === 'assistant' ? 'Claude' : 'User',
+    sender_name: message.senderName || (message.role === 'assistant' ? 'Claude' : 'User'),
     role: message.role || 'user',
     content: message.content,
-    group_id: config.groupId,
-    group_name: 'Claude Code Session'
+    group_id: config.groupId
   };
+
+  // Add flush parameter if specified (forces memory extraction)
+  if (message.flush) {
+    requestBody.flush = true;
+  }
 
   // Make the actual API call
   let response, responseText, responseData, status, ok;
@@ -202,7 +223,6 @@ export async function addMemory(message) {
     responseText = fetchError.message;
   }
 
-  // Always return full info for debugging
   return {
     url,
     body: requestBody,
@@ -296,4 +316,83 @@ export function transformGetMemoriesResults(apiResponse) {
   memories.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 
   return memories;
+}
+
+/**
+ * Set conversation metadata in EverMem Cloud
+ * Called when a new group is created for the first time
+ * @param {Object} options - Metadata options
+ * @param {string} options.groupId - The group ID
+ * @param {string} options.projectName - Project folder name
+ * @param {string} options.projectPath - Full path to the project
+ * @param {string} options.keyId - Hashed API key identifier
+ * @returns {Promise<Object>} API response with status
+ */
+export async function setConversationMetadata(options) {
+  const config = getConfig();
+
+  if (!config.isConfigured) {
+    return { ok: false, error: 'API key not configured' };
+  }
+
+  const { groupId, projectName, projectPath, keyId } = options;
+  const url = `${config.apiBaseUrl}/api/v0/memories/conversation-meta`;
+  const timestamp = new Date().toISOString();
+
+  // This is the same info written to groups.jsonl
+  const groupEntry = {
+    keyId,
+    groupId,
+    name: projectName,
+    path: projectPath,
+    timestamp
+  };
+
+  const requestBody = {
+    created_at: timestamp,
+    description: `Claude Code project: ${projectPath}`,
+    tags: ['claude-plugin', 'claude-code', projectName],
+    user_details: {
+      [config.userId]: {
+        full_name: 'User',
+        role: 'user',
+        custom_role: 'developer'
+      },
+      'claude-assistant': {
+        full_name: 'Claude',
+        role: 'assistant',
+        custom_role: 'ai-assistant',
+        extra: {
+          scene_desc: groupEntry,
+          scene: 'assistant'
+        }
+      }
+    },
+    group_id: groupId,
+    name: 'Claude ' + projectName
+  };
+
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${config.apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(requestBody)
+    });
+
+    const data = await response.json();
+
+    return {
+      ok: response.ok,
+      status: response.status,
+      data
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error.message
+    };
+  }
 }

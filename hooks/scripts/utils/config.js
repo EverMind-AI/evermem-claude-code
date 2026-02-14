@@ -67,8 +67,8 @@ export function getGroupId() {
   // Hash the full path and take first 5 chars
   const pathHash = createHash('sha256').update(cwd).digest('hex').substring(0, 5);
 
-  // Combine: 4 chars name + 5 chars hash = 9 chars
-  return `${namePrefix}${pathHash}`;
+  // Combine: 4 chars name + '_' + 5 chars hash = 10 chars
+  return `${namePrefix}_${pathHash}`;
 }
 
 /**

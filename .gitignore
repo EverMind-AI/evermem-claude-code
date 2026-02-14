@@ -1,7 +1,7 @@
 # PRD files (internal only)
 *-prd.md
-groups.jsonl
-sessions.jsonl
+
+# Data files (local storage, temporary files)
 *.jsonl
 # Dependencies
 node_modules/
@@ -22,13 +22,16 @@ Thumbs.db
 *.swo
 
 # Test files
+test/
 testing_repo/
 
 # Build artifacts
 dist/
 *.log
 
+# Debug utilities (internal only)
+hooks/scripts/utils/debug.js
+
 # Environment
 .env
 .env.*
-testing_repo/

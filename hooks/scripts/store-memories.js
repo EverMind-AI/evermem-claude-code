@@ -1,15 +1,110 @@
 #!/usr/bin/env node
 
+/**
+ * EverMem Stop Hook - Store Memories
+ *
+ * Extracts Q&A pairs from the current turn and uploads to EverMem Cloud.
+ *
+ * Key Features:
+ * - Identifies individual Q&A pairs within a turn (not just merge all content)
+ * - Handles user interruptions ([Request interrupted by user])
+ * - Distinguishes user questions (string) from tool results (array)
+ * - Uploads all complete Q&A pairs
+ */
+
 process.on('uncaughtException', () => process.exit(0));
 process.on('unhandledRejection', () => process.exit(0));
 
 import { readFileSync, existsSync } from 'fs';
-import { isConfigured } from './utils/config.js';  // This loads .env
+import { isConfigured } from './utils/config.js';
 import { addMemory } from './utils/evermem-api.js';
-import { debug, setDebugPrefix } from './utils/debug.js';
 
-// Set debug prefix for this script
-setDebugPrefix('store');
+// Content length limits
+// User: truncate if too long (context compaction summaries are typically ~10KB)
+// Assistant: truncate if too long (valuable content, keep but limit size)
+const MAX_USER_LENGTH = 2000;              // User content > 2000 chars → truncate
+const MAX_USER_CONCAT_LENGTH = 6000;       // Stop concatenating user content at this limit
+const MAX_ASSISTANT_LENGTH = 4000;         // Assistant content > 4000 chars → truncate
+const MAX_ASSISTANT_CONCAT_LENGTH = 15000; // Stop concatenating assistant text blocks at this limit
+
+/**
+ * Truncate content if it exceeds max length
+ * @param {string} content - Content to truncate
+ * @param {number} maxLength - Maximum length (default: MAX_ASSISTANT_LENGTH)
+ */
+function truncateContent(content, maxLength = MAX_ASSISTANT_LENGTH) {
+  if (!content || content.length <= maxLength) {
+    return { content, truncated: false, originalLength: content?.length || 0 };
+  }
+  const originalLength = content.length;
+  return {
+    content: content.substring(0, maxLength) + `\n\n[... truncated, original: ${originalLength} chars]`,
+    truncated: true,
+    originalLength
+  };
+}
+
+/**
+ * Check if line is a user question (new Q&A start)
+ * Key: content must be a STRING (not array)
+ */
+function isUserQuestion(line) {
+  return line.type === 'user'
+    && line.message?.role === 'user'
+    && typeof line.message?.content === 'string';
+}
+
+/**
+ * Check if line is an interrupt marker
+ */
+function isInterruptMarker(line) {
+  if (line.type !== 'user') return false;
+  const content = line.message?.content;
+  if (!Array.isArray(content)) return false;
+  return content.some(c =>
+    c.type === 'text' && c.text === '[Request interrupted by user]'
+  );
+}
+
+/**
+ * Check if line is assistant text response
+ */
+function isAssistantText(line) {
+  if (line.type !== 'assistant') return false;
+  const content = line.message?.content;
+  if (!Array.isArray(content)) return false;
+  return content.some(c => c.type === 'text');
+}
+
+/**
+ * Extract text from assistant message
+ */
+function extractAssistantText(line) {
+  const content = line.message?.content || [];
+  return content
+    .filter(c => c.type === 'text')
+    .map(c => c.text)
+    .join('\n\n');
+}
+
+/**
+ * Check if content is meaningful (not system messages or empty responses)
+ */
+function hasContent(text) {
+  if (!text || !text.trim()) return false;
+  const trimmed = text.trim();
+
+  // Filter out system messages (various XML-like tags)
+  if (trimmed.startsWith('<local-command-')) return false;
+  if (trimmed.startsWith('<system-reminder>')) return false;
+  if (trimmed.startsWith('<command-name>')) return false;
+  if (trimmed.startsWith('<local-command-caveat>')) return false;
+
+  // Filter out no-op responses
+  if (trimmed === 'No response requested.') return false;
+
+  return true;
+}
 
 try {
   let input = '';
@@ -18,10 +113,8 @@ try {
   }
 
   const hookInput = JSON.parse(input);
-  debug('hookInput:', hookInput);
   const transcriptPath = hookInput.transcript_path;
 
-  // Set cwd from hook input for config.getGroupId()
   if (hookInput.cwd) {
     process.env.EVERMEM_CWD = hookInput.cwd;
   }
@@ -32,90 +125,44 @@ try {
 
   /**
    * Read transcript file with retry logic
-   * Waits for turn_duration marker which indicates the turn is complete
    */
   async function readTranscriptWithRetry(path, maxRetries = 5, delayMs = 100) {
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       const content = readFileSync(path, 'utf8');
       const lines = content.trim().split('\n');
 
-      // Check if the last line is turn_duration (indicates turn is complete)
       let isComplete = false;
       try {
         const lastLine = JSON.parse(lines[lines.length - 1]);
         isComplete = lastLine.type === 'system' && lastLine.subtype === 'turn_duration';
       } catch {}
 
-      debug(`read attempt ${attempt}:`, {
-        totalLines: lines.length,
-        isComplete,
-        lastLineType: (() => {
-          try {
-            const e = JSON.parse(lines[lines.length - 1]);
-            return e.subtype ? `${e.type}/${e.subtype}` : e.type;
-          } catch { return 'unknown'; }
-        })()
-      });
-
       if (isComplete) {
         return lines;
       }
 
       if (attempt < maxRetries) {
-        debug(`turn not complete, waiting ${delayMs}ms before retry...`);
         await new Promise(resolve => setTimeout(resolve, delayMs));
       }
     }
 
-    // Return whatever we have after max retries
-    debug('max retries reached, proceeding with current content');
     const content = readFileSync(path, 'utf8');
     return content.trim().split('\n');
   }
 
   const lines = await readTranscriptWithRetry(transcriptPath);
 
-  // Debug: show last 3 lines of the file (just the type)
-  debug('last 3 lines types:', lines.slice(-3).map((line, idx) => {
-    try {
-      const e = JSON.parse(line);
-      return { index: lines.length - 3 + idx, type: e.type, subtype: e.subtype, hasContent: !!e.message?.content };
-    } catch { return { index: lines.length - 3 + idx, error: 'parse failed' }; }
-  }));
-
   /**
-   * Check if content is meaningful (not just whitespace/newlines)
-   * @param {string} text
-   * @returns {boolean}
+   * Extract Q&A pairs from the last turn
+   *
+   * New Logic:
+   * - user(string) starts a new Q&A
+   * - [Request interrupted by user] discards current Q&A
+   * - assistant(text) appends to current Q&A
+   * - Only Q&A pairs with both user AND assistant content are saved
    */
-  function hasContent(text) {
-    return text && text.trim().length > 0;
-  }
-
-  /**
-   * Extract the last turn's user input and assistant response
-   *
-   * A Turn = User sends message → Claude responds (may include multiple tool calls)
-   * Turn boundary is marked by: {"type":"system","subtype":"turn_duration"}
-   *
-   * User messages may be:
-   *   - Original input: {"type":"user","message":{"content":"string"}}
-   *   - Tool result: {"type":"user","message":{"content":[{"type":"tool_result",...}]}}
-   *
-   * Assistant messages may contain multiple content blocks:
-   *   - thinking: Claude's internal reasoning
-   *   - tool_use: Tool invocations
-   *   - text: Final response to user (this is what we want)
-   */
-  function extractLastTurn(lines) {
-    // IMPORTANT: When Stop hook runs, turn_duration for current turn hasn't been written yet.
-    // The turn_duration marker is written AFTER the Stop hook completes.
-    // So current turn END is always at the end of the file.
-    const turnEndIndex = lines.length;
-
-    // Current turn START is right after the last turn_duration marker.
-    // Only turn_duration marks turn boundaries (file-history-snapshot is NOT a turn boundary).
-    // If no marker found, start from beginning of file.
+  function extractQAPairs(lines) {
+    // Find turn start: after the last turn_duration marker
     let turnStartIndex = 0;
     for (let i = lines.length - 1; i >= 0; i--) {
       try {
@@ -127,172 +174,157 @@ try {
       } catch {}
     }
 
-    debug('turn range:', { turnStartIndex, turnEndIndex, totalLines: lines.length });
+    const qaPairs = [];
+    let currentQA = null;
 
-    // Collect user and assistant content from the turn
-    const userTexts = [];
-    const assistantTexts = [];
-
-    // Debug: log each line's type in the turn
-    const lineTypes = [];
-
-    for (let i = turnStartIndex; i < turnEndIndex; i++) {
+    for (let i = turnStartIndex; i < lines.length; i++) {
+      let line;
       try {
-        const e = JSON.parse(lines[i]);
-        const content = e.message?.content;
+        line = JSON.parse(lines[i]);
+      } catch {
+        continue;
+      }
 
-        // Debug: record line type
-        const lineInfo = { index: i, type: e.type };
-        if (e.type === 'assistant' && Array.isArray(content)) {
-          lineInfo.contentTypes = content.map(b => b.type);
+      // 1. User question starts a new Q&A
+      if (isUserQuestion(line)) {
+        // Save previous Q&A if it has an answer
+        if (currentQA && hasContent(currentQA.assistant)) {
+          qaPairs.push(currentQA);
         }
-        lineTypes.push(lineInfo);
+        // Start new Q&A
+        currentQA = {
+          user: line.message.content,
+          assistant: '',
+          timestamp: line.timestamp
+        };
+      }
 
-        if (e.type === 'user') {
-          // User message - distinguish between original input and tool_result
-          if (typeof content === 'string') {
-            // Original user input (plain string)
-            userTexts.push(content);
-          } else if (Array.isArray(content)) {
-            // Check if it's a tool_result (skip) or text blocks (include)
-            for (const block of content) {
-              if (block.type === 'text' && block.text) {
-                userTexts.push(block.text);
-              }
-              // Skip tool_result - it's part of Claude's workflow, not user input
+      // 2. Interrupt marker - discard current Q&A
+      else if (isInterruptMarker(line)) {
+        currentQA = null;
+      }
+
+      // 3. Assistant text - append to current Q&A (with concat limit)
+      else if (isAssistantText(line) && currentQA) {
+        // Stop concatenating if already at limit
+        if (currentQA.assistant.length >= MAX_ASSISTANT_CONCAT_LENGTH) {
+          continue;
+        }
+        const text = extractAssistantText(line);
+        if (text) {
+          const newContent = (currentQA.assistant ? '\n\n' : '') + text;
+          // Only add if it doesn't exceed concat limit too much
+          if (currentQA.assistant.length + newContent.length <= MAX_ASSISTANT_CONCAT_LENGTH) {
+            currentQA.assistant += newContent;
+          } else {
+            // Add partial content up to limit
+            const remaining = MAX_ASSISTANT_CONCAT_LENGTH - currentQA.assistant.length;
+            if (remaining > 100) {  // Only add if meaningful amount left
+              currentQA.assistant += newContent.substring(0, remaining);
             }
           }
         }
-
-        if (e.type === 'assistant') {
-          // Assistant message - extract text blocks only
-          if (Array.isArray(content)) {
-            for (const block of content) {
-              if (block.type === 'text' && block.text) {
-                assistantTexts.push(block.text);
-              }
-              // Skip: thinking (internal), tool_use (workflow)
-            }
-          } else if (typeof content === 'string') {
-            assistantTexts.push(content);
-          }
-        }
-      } catch {}
+      }
     }
 
-    // Debug: output line types
-    debug('line types in turn:', lineTypes);
-    debug('assistantTexts count:', assistantTexts.length);
+    // Save last Q&A if it has an answer
+    if (currentQA && hasContent(currentQA.assistant)) {
+      qaPairs.push(currentQA);
+    }
 
-    return {
-      user: userTexts.join('\n\n'),
-      assistant: assistantTexts.join('\n\n')
-    };
+    return qaPairs;
   }
 
-  // Extract the last turn's content
-  const lastTurn = extractLastTurn(lines);
-  const lastUser = lastTurn.user;
-  const lastAssistant = lastTurn.assistant;
+  // Extract Q&A pairs from the current turn
+  const qaPairs = extractQAPairs(lines);
 
-  debug('extracted:', {
-    userLength: lastUser?.length || 0,
-    assistantLength: lastAssistant?.length || 0,
-    userPreview: lastUser?.slice(0, 100),
-    assistantPreview: lastAssistant?.slice(0, 100)
-  });
+  if (qaPairs.length === 0) {
+    // No complete Q&A pairs to save
+    process.exit(0);
+  }
 
-  // Run both in parallel with Promise.all
+  // Only save the LAST Q&A pair (current conversation)
+  // This avoids duplicates from timing issues where turn_duration isn't written yet
+  const lastQA = qaPairs[qaPairs.length - 1];
+  const qaPairsToSave = [lastQA];
+
+  // Upload Q&A pair(s)
   const promises = [];
   const results = [];
-  const skipped = [];
 
-  // Check if user content is meaningful
-  if (lastUser) {
-    if (hasContent(lastUser)) {
-      const len = lastUser.length;
+  for (let i = 0; i < qaPairsToSave.length; i++) {
+    const qa = qaPairsToSave[i];
+    const timestamp = Date.now() + i; // Ensure unique timestamps
+
+    // Upload user content (truncate if too long)
+    if (hasContent(qa.user)) {
+      // Limit user content before truncation (in case of very long content)
+      const limitedUser = qa.user.length > MAX_USER_CONCAT_LENGTH
+        ? qa.user.substring(0, MAX_USER_CONCAT_LENGTH)
+        : qa.user;
+      const { content: userContent, truncated: userTruncated } = truncateContent(limitedUser, MAX_USER_LENGTH);
+      const userLen = qa.user.length;
       promises.push(
-        addMemory({ content: lastUser, role: 'user', messageId: `u_${Date.now()}` })
-          .then(r => results.push({ type: 'USER', len, ...r }))
-          .catch(e => results.push({ type: 'USER', len, ok: false, error: e.message }))
+        addMemory({ content: userContent, role: 'user', messageId: `u_${timestamp}` })
+          .then(r => results.push({ type: 'USER', len: userLen, truncated: userTruncated || qa.user.length > MAX_USER_CONCAT_LENGTH, qaIndex: i, ...r }))
+          .catch(e => results.push({ type: 'USER', len: userLen, truncated: userTruncated || qa.user.length > MAX_USER_CONCAT_LENGTH, qaIndex: i, ok: false, error: e.message }))
       );
-    } else {
-      skipped.push({ type: 'USER', reason: 'whitespace-only content' });
     }
-  }
 
-  // Check if assistant content is meaningful
-  if (lastAssistant) {
-    if (hasContent(lastAssistant)) {
-      const len = lastAssistant.length;
+    // Upload assistant content (truncate if too long, but always save)
+    if (hasContent(qa.assistant)) {
+      const { content: assistantContent, truncated: assistantTruncated } = truncateContent(qa.assistant, MAX_ASSISTANT_LENGTH);
+      const assistantLen = qa.assistant.length;
       promises.push(
-        addMemory({ content: lastAssistant, role: 'assistant', messageId: `a_${Date.now()}` })
-          .then(r => results.push({ type: 'ASSISTANT', len, ...r }))
-          .catch(e => results.push({ type: 'ASSISTANT', len, ok: false, error: e.message }))
+        addMemory({ content: assistantContent, role: 'assistant', messageId: `a_${timestamp}` })
+          .then(r => results.push({ type: 'ASSISTANT', len: assistantLen, truncated: assistantTruncated, qaIndex: i, ...r }))
+          .catch(e => results.push({ type: 'ASSISTANT', len: assistantLen, truncated: assistantTruncated, qaIndex: i, ok: false, error: e.message }))
       );
-    } else {
-      skipped.push({ type: 'ASSISTANT', reason: 'whitespace-only content' });
     }
   }
 
   await Promise.all(promises);
 
-  // Check if all calls succeeded
+  // Check results
   const allSuccess = results.length > 0 && results.every(r => r.ok && !r.error);
 
-  // Debug output
-  debug('results:', results);
-  debug('skipped:', skipped);
-
-  // Build output message
   let output = '';
 
   if (allSuccess) {
-    const details = results.map(r => `${r.type.toLowerCase()}: ${r.len}`).join(', ');
+    // Build detailed output - sort by type to show user first, then assistant
+    const sortedResults = [...results].sort((a, b) => {
+      if (a.type === 'USER' && b.type === 'ASSISTANT') return -1;
+      if (a.type === 'ASSISTANT' && b.type === 'USER') return 1;
+      return 0;
+    });
+
+    const details = sortedResults.map(r => {
+      let info = `${r.type.toLowerCase()}: ${r.len}`;
+      if (r.truncated) info += ' (truncated)';
+      return info;
+    }).join(', ');
+
     output = `💾 Memory saved (${results.length}) [${details}]`;
-    // Add skipped info if any
-    if (skipped.length > 0) {
-      output += `\n⏭️ Skipped: ${skipped.map(s => `${s.type} (${s.reason})`).join(', ')}`;
-    }
     process.stdout.write(JSON.stringify({ systemMessage: output }));
     process.exit(0);
-  } else if (results.length === 0 && skipped.length > 0) {
-    // All content was skipped
-    output = `⏭️ EverMem: No content to save\n`;
-    for (const s of skipped) {
-      output += `  • ${s.type}: ${s.reason}\n`;
-    }
-    process.stdout.write(JSON.stringify({ systemMessage: output }));
+  } else if (results.length === 0) {
     process.exit(0);
   } else {
-    // Failure: show detailed errors via systemMessage
-    function truncateBody(body) {
-      if (!body) return body;
-      const copy = { ...body };
-      if (copy.content && typeof copy.content === 'string' && copy.content.length > 100) {
-        copy.content = copy.content.substring(0, 100) + '... [truncated]';
-      }
-      return copy;
-    }
+    // Partial failure
+    const succeeded = results.filter(r => r.ok && !r.error).length;
+    const failed = results.filter(r => !r.ok || r.error).length;
 
-    output = '💾 EverMem: Save failed\n';
+    output = `💾 EverMem: ${succeeded} saved, ${failed} failed\n`;
     for (const r of results) {
       if (r.error) {
-        output += `${r.type}: ERROR - ${r.error}\n`;
+        output += `  • ${r.type} (Q&A ${r.qaIndex + 1}): ERROR - ${r.error}\n`;
       } else if (!r.ok) {
-        output += `${r.type}: FAILED (${r.status})\n`;
-        output += `Request: ${JSON.stringify(truncateBody(r.body), null, 2)}\n`;
-        output += `Response: ${JSON.stringify(r.response, null, 2)}\n`;
+        output += `  • ${r.type} (Q&A ${r.qaIndex + 1}): FAILED (${r.status})\n`;
       }
-    }
-    // Also show skipped if any
-    if (skipped.length > 0) {
-      output += `⏭️ Skipped: ${skipped.map(s => `${s.type} (${s.reason})`).join(', ')}\n`;
     }
     process.stdout.write(JSON.stringify({ systemMessage: output }));
   }
 
 } catch (e) {
-  // Silent on errors
   process.exit(0);
 }

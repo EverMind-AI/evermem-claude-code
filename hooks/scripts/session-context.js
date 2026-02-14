@@ -25,10 +25,11 @@ if (major < 18) {
   process.exit(0);
 }
 
-import { readFileSync, existsSync } from 'fs';
+ import { readFileSync, writeFileSync, existsSync, statSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { getMemories, transformGetMemoriesResults } from './utils/evermem-api.js';
+import { createHash } from 'crypto';
+import { getMemories, transformGetMemoriesResults, addMemory } from './utils/evermem-api.js';
 import { getConfig, getGroupId } from './utils/config.js';
 import { saveGroup } from './utils/groups-store.js';
 
@@ -37,6 +38,60 @@ const SESSIONS_FILE = resolve(__dirname, '../../data/sessions.jsonl');
 
 const RECENT_MEMORY_COUNT = 5;  // Number of recent memories to load
 const PAGE_SIZE = 100;          // Fetch more to get the latest (API returns old to new)
+
+// Debounce settings to prevent duplicate hook calls
+// Note: File names are project-specific (using cwd hash) to isolate different projects
+const DEBOUNCE_MS = 1000;  // Skip if called again within 1 second
+
+/**
+ * Get project-specific debounce file paths
+ * Uses hash of cwd to isolate different projects
+ */
+function getDebounceFiles(cwd) {
+  const cwdHash = createHash('sha256').update(cwd || 'default').digest('hex').substring(0, 8);
+  return {
+    lockFile: `/tmp/evermem-session-start-${cwdHash}.lock`,
+    outputFile: `/tmp/evermem-session-start-${cwdHash}-output.json`
+  };
+}
+
+/**
+ * Check if we should skip this call (duplicate within debounce window)
+ * @param {string} cwd - Current working directory (for project-specific cache)
+ * @returns {string|null} Cached output if should skip, null if should proceed
+ */
+function getCachedOutputIfDebounced(cwd) {
+  try {
+    const { lockFile, outputFile } = getDebounceFiles(cwd);
+    if (existsSync(lockFile)) {
+      const stat = statSync(lockFile);
+      if (Date.now() - stat.mtimeMs < DEBOUNCE_MS) {
+        // Within debounce window, return cached output if available
+        if (existsSync(outputFile)) {
+          return readFileSync(outputFile, 'utf8');
+        }
+        return JSON.stringify({ continue: true, systemMessage: '💡 EverMem: Ready' });
+      }
+    }
+    // Update lock file timestamp
+    writeFileSync(lockFile, Date.now().toString());
+    return null;  // Proceed with full execution
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Cache the output for debounced calls to reuse
+ * @param {string} cwd - Current working directory (for project-specific cache)
+ * @param {string} output - Output to cache
+ */
+function cacheOutput(cwd, output) {
+  try {
+    const { outputFile } = getDebounceFiles(cwd);
+    writeFileSync(outputFile, output);
+  } catch {}
+}
 
 /**
  * Get the most recent session summary for current group
@@ -106,20 +161,41 @@ async function main() {
   }
 
   // Set cwd from hook input for config.getGroupId()
-  if (hookInput.cwd) {
-    process.env.EVERMEM_CWD = hookInput.cwd;
+  const cwd = hookInput.cwd || process.cwd();
+  process.env.EVERMEM_CWD = cwd;
+
+  // Debounce: skip duplicate API calls within 1 second
+  // But reuse cached output to show valuable info
+  // Note: Uses project-specific cache files to isolate different projects
+  const cachedOutput = getCachedOutputIfDebounced(cwd);
+  if (cachedOutput) {
+    console.log(cachedOutput);
+    return;
   }
 
   const config = getConfig();
 
   // Save group to local storage (track which projects use EverMem)
+  // Also calls Set Conversation Metadata API for new groups
   if (hookInput.cwd) {
-    try {
-      saveGroup(getGroupId(), hookInput.cwd);
-    } catch (groupError) {
+    saveGroup(getGroupId(), hookInput.cwd).catch(groupError => {
       // Non-blocking, but log for debugging
       console.error(`EverMem groups-store error: ${groupError.message}`);
-    }
+    });
+  }
+
+  // Send session start memory to EverMem Cloud
+  const { session_id, is_resumed } = hookInput;
+  if (session_id && hookInput.cwd && config.isConfigured) {
+    const action = is_resumed ? 'resumed' : 'created';
+    const groupId = getGroupId();
+    const content = `[Session Start] User ${action} session at ${new Date().toISOString()}. session_id: ${session_id}, group_id: ${groupId}, path: ${hookInput.cwd}`;
+    addMemory({
+      messageId: `session_start_${Date.now()}`,
+      content,
+      role: 'user',
+      senderName: 'System'
+    }).catch(() => {});
   }
 
   if (!config.isConfigured) {
@@ -169,39 +245,107 @@ async function main() {
 
     // Build display output - show meaningful content, concise but informative
     let displayOutput;
-    if (lastSession) {
-      // Show last session: time, turns, summary
-      const truncatedSummary = lastSession.summary.length > 40
-        ? lastSession.summary.substring(0, 40) + '...'
-        : lastSession.summary;
-      const timeAgo = formatRelativeTime(lastSession.timestamp);
-      displayOutput = `💡 EverMem: Last (${timeAgo}, ${lastSession.turnCount} turns): "${truncatedSummary}"`;
 
-      // Add memory preview if available
-      if (recentMemories.length > 0) {
-        const memorySubjects = recentMemories.slice(0, 2).map(m => {
-          const subj = m.subject || '';
-          return subj.length > 15 ? subj.substring(0, 15) + '..' : subj;
-        }).join(', ');
-        displayOutput += ` | ${recentMemories.length} memories: ${memorySubjects}`;
+    // Check if lastSession has a valid summary
+    let validLastSession = null;
+    if (lastSession) {
+      // Clean summary: remove system tags
+      let cleanSummary = lastSession.summary
+        .replace(/<[^>]+>/g, '')  // Remove XML-like tags
+        .replace(/\s+/g, ' ')     // Normalize whitespace
+        .trim();
+
+      // Secondary filter: skip if cleaned summary is still invalid
+      // (e.g., starts with /, contains only command remnants, too short)
+      const isValidSummary = cleanSummary.length > 5 &&
+        !cleanSummary.startsWith('/') &&
+        !cleanSummary.startsWith('Caveat:') &&
+        !/^[a-z]+ [a-z]+$/i.test(cleanSummary);  // Skip "clear clear" patterns
+
+      if (isValidSummary) {
+        validLastSession = {
+          ...lastSession,
+          cleanSummary: cleanSummary.length > 60
+            ? cleanSummary.substring(0, 60) + '...'
+            : cleanSummary
+        };
       }
+    }
+
+    // Extract meaningful subjects from cloud memories (max 2-3, truncated)
+    // Filter out system-generated memories (session start/end, etc.)
+    let memoryPreview = '';
+    if (recentMemories.length > 0) {
+      const MAX_PREVIEW_MEMORIES = 2;
+      const MAX_SUBJECT_LENGTH = 40;
+
+      // Filter out system messages (session lifecycle, system logs, etc.)
+      const meaningfulMemories = recentMemories.filter(m => {
+        const subject = (m.subject || '').toLowerCase();
+        const text = (m.text || '').toLowerCase();
+        // Skip session lifecycle messages
+        if (subject.includes('session start') ||
+            subject.includes('session end') ||
+            subject.includes('session initialization') ||
+            subject.includes('session creation') ||
+            subject.includes('project session end') ||
+            subject.includes('system log') ||
+            subject.includes('user exited') ||
+            subject.includes('user created session') ||
+            subject.includes('user resumed session') ||
+            text.includes('[session start]') ||
+            text.includes('[session end]')) {
+          return false;
+        }
+        return true;
+      });
+
+      const subjects = meaningfulMemories
+        .slice(0, MAX_PREVIEW_MEMORIES)
+        .map(m => {
+          let subject = m.subject || '';
+          // Remove date prefix patterns like "2026年2月14日" or "February 14, 2026"
+          subject = subject.replace(/^\d{4}年\d{1,2}月\d{1,2}日[^:：]*[:：]\s*/i, '');
+          subject = subject.replace(/^(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},?\s*\d{4}[^:]*:\s*/i, '');
+          subject = subject.trim();
+          // Truncate
+          if (subject.length > MAX_SUBJECT_LENGTH) {
+            subject = subject.substring(0, MAX_SUBJECT_LENGTH) + '...';
+          }
+          return subject;
+        })
+        .filter(s => s.length > 0);
+
+      if (subjects.length > 0) {
+        memoryPreview = subjects.join(' | ');
+      }
+    }
+
+    if (validLastSession) {
+      const timeAgo = formatRelativeTime(validLastSession.timestamp);
+      // Format: "Previous session (time, N turns) | memory subjects"
+      displayOutput = `💡 EverMem: Previous session (${timeAgo}, ${validLastSession.turnCount} turns)`;
+
+      if (memoryPreview) {
+        displayOutput += ` | ${memoryPreview}`;
+      }
+    } else if (memoryPreview) {
+      // No valid local session, show cloud memory subjects
+      displayOutput = `💡 EverMem: Recent work: ${memoryPreview}`;
     } else if (recentMemories.length > 0) {
-      // No last session, show recent memories with subjects
-      const memorySubjects = recentMemories.slice(0, 3).map(m => {
-        const subj = m.subject || '';
-        return subj.length > 20 ? subj.substring(0, 20) + '..' : subj;
-      }).join(', ');
-      displayOutput = `💡 EverMem: ${recentMemories.length} memories: ${memorySubjects}`;
+      displayOutput = `💡 EverMem: ${recentMemories.length} cloud memories loaded`;
     } else {
       displayOutput = `💡 EverMem: Ready`;
     }
 
     // Output: display to user and add to context
-    console.log(JSON.stringify({
+    const output = JSON.stringify({
       continue: true,
       systemMessage: displayOutput,
       systemPrompt: contextMessage
-    }));
+    });
+    cacheOutput(cwd, output);  // Cache for debounced calls (project-specific)
+    console.log(output);
 
   } catch (error) {
     // Don't block session start on errors, but provide detailed error info

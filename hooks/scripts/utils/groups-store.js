@@ -11,6 +11,7 @@ import { readFileSync, appendFileSync, existsSync } from 'fs';
 import { resolve, dirname, basename } from 'path';
 import { fileURLToPath } from 'url';
 import { getKeyId } from './config.js';
+import { setConversationMetadata } from './evermem-api.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const GROUPS_FILE = resolve(__dirname, '../../../data/groups.jsonl');
@@ -48,11 +49,12 @@ function alreadyExists(groupId, keyId) {
 /**
  * Append a group entry to the JSONL file
  * Only records if the groupId+keyId combination doesn't already exist
+ * Also calls Set Conversation Metadata API for new groups
  * @param {string} groupId - The group ID
  * @param {string} cwd - The working directory path
- * @returns {Object|null} The entry if saved, null if skipped or error
+ * @returns {Promise<Object|null>} The entry if saved, null if skipped or error
  */
-export function saveGroup(groupId, cwd) {
+export async function saveGroup(groupId, cwd) {
   try {
     const keyId = getKeyId();
 
@@ -61,14 +63,34 @@ export function saveGroup(groupId, cwd) {
       return null;
     }
 
+    const projectName = basename(cwd);
     const entry = {
       keyId,  // Hashed API key identifier (null if not configured)
       groupId,
-      name: basename(cwd),
+      name: projectName,
       path: cwd,
       timestamp: new Date().toISOString()
     };
+
+    // Double-check before write (防止竞态条件)
+    // Small delay + re-check to reduce race condition window
+    await new Promise(r => setTimeout(r, 10));
+    if (alreadyExists(groupId, keyId)) {
+      return null;
+    }
+
+    // Save to local file
     appendFileSync(GROUPS_FILE, JSON.stringify(entry) + '\n', 'utf8');
+
+    // Call Set Conversation Metadata API for new groups
+    // Run async but don't block on it
+    setConversationMetadata({
+      groupId,
+      projectName,
+      projectPath: cwd,
+      keyId
+    }).catch(() => {});
+
     return entry;
   } catch (e) {
     // Silent on errors

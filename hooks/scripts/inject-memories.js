@@ -18,10 +18,6 @@
 import { isConfigured } from './utils/config.js';
 import { searchMemories, transformSearchResults } from './utils/evermem-api.js';
 import { formatRelativeTime } from './utils/mock-store.js';
-import { debug, setDebugPrefix } from './utils/debug.js';
-
-// Set debug prefix for this script
-setDebugPrefix('inject');
 
 const MIN_WORDS = 3;
 const MAX_MEMORIES = 5;
@@ -65,8 +61,6 @@ async function main() {
     const data = JSON.parse(input);
     const prompt = data.prompt || '';
 
-    debug('hookInput:', data);
-
     // Set cwd from hook input for config.getGroupId()
     if (data.cwd) {
       process.env.EVERMEM_CWD = data.cwd;
@@ -75,13 +69,11 @@ async function main() {
     // Skip short prompts silently
     const wordCount = countWords(prompt);
     if (wordCount < MIN_WORDS) {
-      debug('skipped: prompt too short', { wordCount, minWords: MIN_WORDS });
       process.exit(0);
     }
 
     // Skip if not configured (silent - don't nag users)
     if (!isConfigured()) {
-      debug('skipped: not configured');
       process.exit(0);
     }
 
@@ -89,33 +81,32 @@ async function main() {
     let memories = [];
     let apiResponse = null;
     try {
-      debug('searching memories for prompt:', prompt.slice(0, 100) + (prompt.length > 100 ? '...' : ''));
       apiResponse = await searchMemories(prompt, {
         topK: 15,
         retrieveMethod: 'hybrid'
       });
       memories = transformSearchResults(apiResponse);
-      debug("memories:", memories);
-      debug('search results:', { total: memories.length, memories: memories.map(m => ({ score: m.score, subject: m.subject })) });
     } catch (error) {
       // Silent on API errors - don't block user workflow
-      debug('search error:', error.message);
       process.exit(0);
     }
 
     // Filter by minimum score threshold
     const relevantMemories = memories.filter(m => m.score >= MIN_SCORE);
-    debug('filtered memories:', { total: relevantMemories.length, minScore: MIN_SCORE });
 
-    // No relevant memories above threshold - silently exit (this is normal)
+    // No relevant memories above threshold - show feedback and exit
     if (relevantMemories.length === 0) {
-      debug('skipped: no relevant memories above threshold');
+      if (memories.length > 0) {
+        // Found memories but none passed threshold
+        process.stdout.write(JSON.stringify({
+          systemMessage: `📝 Memory: Found ${memories.length} memories, 0 above threshold (${MIN_SCORE})`
+        }));
+      }
       process.exit(0);
     }
 
     // Take top memories
     const selectedMemories = relevantMemories.slice(0, MAX_MEMORIES);
-    debug('selected memories:', selectedMemories.map(m => ({ score: m.score, subject: m.subject, timestamp: m.timestamp })));
 
     // Build context for Claude
     const context = buildContext(selectedMemories);
@@ -132,13 +123,11 @@ async function main() {
       }
     };
 
-    debug('output:', { systemMessage: displayMessage, contextLength: context.length });
     process.stdout.write(JSON.stringify(output));
     process.exit(0);
 
   } catch (error) {
     // Silent on errors - don't block user workflow
-    debug('error:', error.message);
     process.exit(0);
   }
 }

@@ -10,7 +10,7 @@
  */
 
 import http from 'http';
-import { execSync } from 'child_process';
+import https from 'https';
 import { readFileSync, existsSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
@@ -21,6 +21,53 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.EVERMEM_PROXY_PORT || 3456;
 const API_BASE = 'https://api.evermind.ai';
 const GROUPS_FILE = join(__dirname, '..', 'data', 'groups.jsonl');
+
+/**
+ * Validate Authorization header format (prevent injection)
+ * Only allows: Bearer [alphanumeric, hyphen, underscore, period]
+ */
+function isValidAuthHeader(authHeader) {
+  if (!authHeader || typeof authHeader !== 'string') return false;
+  // Only allow safe characters in Bearer token
+  return /^Bearer [a-zA-Z0-9_\-\.]+$/.test(authHeader);
+}
+
+/**
+ * Make HTTPS request with body (supports GET with body)
+ * @param {string} url - Full URL
+ * @param {Object} options - Request options (method, headers)
+ * @param {string} body - Request body
+ * @param {number} timeout - Timeout in ms
+ * @returns {Promise<{status: number, data: Object}>}
+ */
+function httpsRequest(url, options, body, timeout = 30000) {
+  return new Promise((resolve, reject) => {
+    const urlObj = new URL(url);
+
+    const req = https.request(urlObj, options, (res) => {
+      let data = '';
+      res.on('data', chunk => { data += chunk; });
+      res.on('end', () => {
+        try {
+          resolve({ status: res.statusCode, data: JSON.parse(data) });
+        } catch {
+          resolve({ status: res.statusCode, data: { raw: data } });
+        }
+      });
+    });
+
+    req.on('error', reject);
+    req.setTimeout(timeout, () => {
+      req.destroy();
+      reject(new Error(`Request timeout after ${timeout}ms`));
+    });
+
+    if (body) {
+      req.write(body);
+    }
+    req.end();
+  });
+}
 
 /**
  * Compute keyId from API key (SHA-256 hash, first 12 chars)
@@ -110,29 +157,37 @@ const server = http.createServer((req, res) => {
 
     req.on('data', chunk => { body += chunk; });
 
-    req.on('end', () => {
+    req.on('end', async () => {
       const authHeader = req.headers['authorization'];
       if (!authHeader) {
         sendJson(res, 401, { error: 'Missing Authorization header' });
         return;
       }
 
-      try {
-        // Forward as GET with body using curl
-        const jsonBody = body.replace(/'/g, "'\\''");
-        const curlCmd = `curl -s -X GET "${API_BASE}/api/v0/memories" -H "Authorization: ${authHeader}" -H "Content-Type: application/json" -d '${jsonBody}'`;
+      // Validate Authorization header format (prevent injection)
+      if (!isValidAuthHeader(authHeader)) {
+        sendJson(res, 400, { error: 'Invalid Authorization header format' });
+        return;
+      }
 
-        const result = execSync(curlCmd, { timeout: 30000, encoding: 'utf8' });
-        const data = JSON.parse(result);
-        sendJson(res, 200, data);
+      try {
+        // Forward as GET with body using native https (no shell injection risk)
+        const { status, data } = await httpsRequest(
+          `${API_BASE}/api/v0/memories`,
+          {
+            method: 'GET',
+            headers: {
+              'Authorization': authHeader,
+              'Content-Type': 'application/json'
+            }
+          },
+          body,
+          30000
+        );
+        sendJson(res, status, data);
       } catch (error) {
         console.error('Proxy error:', error.message);
-        sendJson(res, 500, {
-          error: 'Proxy request failed',
-          message: error.message,
-          stdout: error.stdout?.toString(),
-          stderr: error.stderr?.toString()
-        });
+        sendJson(res, 500, { error: 'Proxy request failed', message: error.message });
       }
     });
     return;
@@ -144,29 +199,37 @@ const server = http.createServer((req, res) => {
 
     req.on('data', chunk => { body += chunk; });
 
-    req.on('end', () => {
+    req.on('end', async () => {
       const authHeader = req.headers['authorization'];
       if (!authHeader) {
         sendJson(res, 401, { error: 'Missing Authorization header' });
         return;
       }
 
-      try {
-        // Forward as GET with body using curl
-        const jsonBody = body.replace(/'/g, "'\\''");
-        const curlCmd = `curl -s -X GET "${API_BASE}/api/v0/memories/search" -H "Authorization: ${authHeader}" -H "Content-Type: application/json" -d '${jsonBody}'`;
+      // Validate Authorization header format (prevent injection)
+      if (!isValidAuthHeader(authHeader)) {
+        sendJson(res, 400, { error: 'Invalid Authorization header format' });
+        return;
+      }
 
-        const result = execSync(curlCmd, { timeout: 30000, encoding: 'utf8' });
-        const data = JSON.parse(result);
-        sendJson(res, 200, data);
+      try {
+        // Forward as GET with body using native https (no shell injection risk)
+        const { status, data } = await httpsRequest(
+          `${API_BASE}/api/v0/memories/search`,
+          {
+            method: 'GET',
+            headers: {
+              'Authorization': authHeader,
+              'Content-Type': 'application/json'
+            }
+          },
+          body,
+          30000
+        );
+        sendJson(res, status, data);
       } catch (error) {
         console.error('Proxy error:', error.message);
-        sendJson(res, 500, {
-          error: 'Proxy request failed',
-          message: error.message,
-          stdout: error.stdout?.toString(),
-          stderr: error.stderr?.toString()
-        });
+        sendJson(res, 500, { error: 'Proxy request failed', message: error.message });
       }
     });
     return;

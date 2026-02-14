@@ -33,16 +33,21 @@ Visit [console.evermind.ai](https://console.evermind.ai/) to create an account a
 
 ### 2. Configure Environment Variable
 
-Add to your shell profile (`~/.zshrc` or `~/.bashrc`):
+Run one of the following commands (replace `your-api-key-here` with your actual key):
 
 ```bash
-export EVERMEM_API_KEY="your-api-key-here"
+# For zsh (default on macOS)
+echo 'export EVERMEM_API_KEY="your-api-key-here"' >> ~/.zshrc && source ~/.zshrc
+
+# For bash
+echo 'export EVERMEM_API_KEY="your-api-key-here"' >> ~/.bashrc && source ~/.bashrc
 ```
 
-Reload your shell:
+**Verify configuration:**
 
 ```bash
-source ~/.zshrc  # or source ~/.bashrc
+echo $EVERMEM_API_KEY
+# Should output your API key (e.g., xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)
 ```
 
 ### 3. Install the Plugin
@@ -73,11 +78,11 @@ Run `/evermem:help` to check if the plugin is configured correctly.
 | Command | Description |
 |---------|-------------|
 | `/evermem:help` | Show setup status and available commands |
-| `/evermem:search <query>` | Search your memories for specific topics |
+| `/evermem:search <query>` | Search your memories for specific topics (use `Ctrl+O` to expand results) |
 | `/evermem:ask <question>` | Ask about past work (combines memory + context) |
 | `/evermem:hub` | Open the Memory Hub dashboard |
-| `/evermem:debug` | View debug logs for troubleshooting |
 | `/evermem:projects` | View your Claude Code projects table |
+| `/evermem:addHistory` | Upload current session's conversation history to cloud |
 
 ### Automatic Behavior
 
@@ -85,9 +90,9 @@ The plugin works automatically in the background:
 
 **On Session Start:**
 ```
-💡 EverMem: Last session (2h ago): "Implementing JWT authentication..." | 3 memories
+💡 EverMem: Previous session (2h ago, 5 turns) | JWT实现讨论 | API认证设计
 ```
-Recent memories and last session summary are loaded to provide context.
+Previous session info and meaningful cloud memory subjects are displayed. System messages (session start/end notifications) are filtered out.
 
 **On Prompt Submit:**
 ```
@@ -102,8 +107,10 @@ Claude receives the relevant context and responds accordingly
 
 **On Response Complete:**
 ```
-💾 EverMem: Memory saved (4 messages)
+💾 Memory saved (2) [user: 156, assistant: 10977 (truncated)]
 ```
+- User content > 2000 chars is **truncated** (concat limit: 6000)
+- Assistant content > 4000 chars is **truncated** (concat limit: 15000)
 
 ### Memory Hub
 
@@ -118,6 +125,57 @@ The Memory Hub provides a visual interface to explore your memories:
 
 To use the hub, run `/evermem:hub` and follow the instructions.
 
+### Retroactive Import (Old Projects)
+
+For Claude Code projects that existed before installing EverMem, you can upload past conversation history using `/evermem:addHistory`.
+
+**Upload current session:**
+```bash
+/evermem:addHistory
+```
+
+**Upload a specific session:**
+```bash
+# Find session IDs in your project
+ls ~/.claude/projects/-path-to-project/*.jsonl
+
+# Resume the specific session
+claude --resume <session-id>
+
+# Then run the command
+/evermem:addHistory
+```
+
+**Handle multiple sessions:**
+
+A Claude Code project may have multiple sessions (each `/exit` creates a new session file). To upload all of them:
+
+```bash
+# List all sessions for a project
+ls ~/.claude/projects/-Users-me-myproject/*.jsonl
+
+# For each session, resume and upload
+claude --resume abc-123-def
+# Run /evermem:addHistory, then /exit
+
+claude --resume xyz-456-ghi
+# Run /evermem:addHistory, then /exit
+```
+
+**Output example:**
+```
+📤 Uploading session history...
+   Source: ~/.claude/projects/-xxx/abc-123.jsonl
+   Total lines: 1500
+   Q&A pairs found: 45
+   Uploading... 90/90 messages
+
+✅ History uploaded!
+   - 45 Q&A pairs (90 messages uploaded)
+   - 3 skipped (system messages)
+   - 2 skipped (interrupted)
+```
+
 ## Configuration
 
 ### Environment Variables
@@ -125,18 +183,6 @@ To use the hub, run `/evermem:hub` and follow the instructions.
 | Variable | Description | Required |
 |----------|-------------|----------|
 | `EVERMEM_API_KEY` | Your EverMem API key | Yes |
-
-### Project-Specific Settings
-
-Create `.claude/evermem.local.md` in your project root for per-project configuration:
-
-```markdown
----
-group_id: "my-project"
----
-
-Project-specific notes here.
-```
 
 ## Troubleshooting
 
@@ -159,25 +205,31 @@ source ~/.zshrc
 
 ### API Errors
 
+- **400 Bad Request**: Missing required parameters (user_id or group_ids). Check API configuration.
 - **403 Forbidden**: Invalid or expired API key
 - **502 Bad Gateway**: Server temporarily unavailable, try again
 
-### Debug Mode
+## Security
 
-Enable debug logging to troubleshoot issues:
+The plugin implements the following security measures:
 
-```bash
-# Set environment variable
-export EVERMEM_DEBUG=1
+### API Communication
+- All HTTP requests use Node.js native `https` module (no shell command execution)
+- No use of `execSync` with user-controlled input to prevent command injection
+- API keys are never logged or included in error responses
+- `Content-Length` header is always set for requests with body (required for GET with body)
 
-# View logs in real-time
-tail -f /tmp/evermem-debug.log
+### Input Validation
+- Authorization headers are validated with strict regex: `Bearer [a-zA-Z0-9_\-\.]+`
+- Hook inputs from Claude Code are parsed safely with JSON.parse
 
-# Clear logs
-> /tmp/evermem-debug.log
-```
+### Local Storage
+- API key is hashed (SHA-256, first 12 chars) before storing in local files
+- Session data stays local in `data/sessions.jsonl`
+- Group data stays local in `data/groups.jsonl`
 
-Run `/evermem:debug` to view recent debug logs directly.
+### Reporting Issues
+If you discover a security vulnerability, please report it via [GitHub Issues](https://github.com/EverMind-AI/evermem-claude-code/issues) with the "security" label.
 
 ## Links
 
@@ -205,6 +257,8 @@ The following sections explain how EverMem works internally. This is useful for 
                             ▼
 ┌─────────────────────────────────────────────────────────────┐
 │  SessionStart Hook                                          │
+│  • Sends session start memory to Cloud (create/resume)      │
+│  • Saves group to local storage (first time: calls API)     │
 │  • Fetches recent memories from EverMem Cloud               │
 │  • Loads last session summary from local storage            │
 │  • Injects session context into Claude's prompt             │
@@ -220,7 +274,7 @@ The following sections explain how EverMem works internally. This is useful for 
 │  UserPromptSubmit Hook                                      │
 │  • Searches EverMem Cloud for relevant memories             │
 │  • Displays memory summary to user                          │
-│  • Injects context into Claude's prompt                     │
+│  • Injects relevant context into Claude's prompt            │
 └─────────────────────────────────────────────────────────────┘
                             │
                             ▼
@@ -232,7 +286,7 @@ The following sections explain how EverMem works internally. This is useful for 
 ┌─────────────────────────────────────────────────────────────┐
 │  Stop Hook                                                  │
 │  • Extracts conversation from transcript                    │
-│  • Sends to EverMem Cloud for storage                       │
+│  • Sends Q&A pair to EverMem Cloud for storage              │
 │  • Server generates summary and stores memory               │
 └─────────────────────────────────────────────────────────────┘
                             │
@@ -246,9 +300,18 @@ The following sections explain how EverMem works internally. This is useful for 
 │  SessionEnd Hook                                            │
 │  • Parses transcript to extract first user prompt           │
 │  • Saves session summary to local storage                   │
-│  • No AI calls - pure local data extraction                 │
+│  • No cloud API call (quota optimization)                   │
 └─────────────────────────────────────────────────────────────┘
 ```
+
+### Data Flow Summary
+
+| Hook | Local Actions | Cloud Actions |
+|------|---------------|---------------|
+| **SessionStart** | Save group (groups.jsonl) | Send session start memory, Fetch recent memories, Set conversation metadata (first time) |
+| **UserPromptSubmit** | - | Search relevant memories |
+| **Stop** | - | Send Q&A pair for storage |
+| **SessionEnd** | Save session summary (sessions.jsonl) | None (local only) |
 
 ## Claude Code Hooks Mechanism
 
@@ -327,17 +390,17 @@ Claude Code provides a **hooks system** that allows plugins to execute custom sc
 ```json
 {
   "hooks": {
-    "SessionStart": [...],        // Load session context + track groups locally
-    "UserPromptSubmit": [...],    // Search & inject memories
-    "Stop": [...],                // Save conversation to cloud
-    "SessionEnd": [...]           // Save session summary locally
+    "SessionStart": [...],        // Send session start memory + Load context + Track groups
+    "UserPromptSubmit": [...],    // Search & inject relevant memories
+    "Stop": [...],                // Save Q&A pair to cloud
+    "SessionEnd": [...]           // Save summary locally + Send session end memory (flush)
   }
 }
 ```
 
 ## SessionStart Hook
 
-The SessionStart hook runs when Claude Code starts a new session. It loads recent memories from the cloud and last session summary from local storage.
+The SessionStart hook runs when Claude Code starts a new session. It records the session start event, loads recent memories from the cloud, and last session summary from local storage.
 
 ### Architecture
 
@@ -354,19 +417,23 @@ The SessionStart hook runs when Claude Code starts a new session. It loads recen
 ┌─────────────────────────────────────────────────────────────────┐
 │                    session-context.js                            │
 │                                                                  │
-│  1. Read hook input from stdin (contains cwd)                   │
+│  1. Read hook input from stdin (contains cwd, session_id)       │
 │  2. Save group to local storage (groups.jsonl)                  │
-│  3. Fetch recent memories from EverMem API (limit: 100)         │
-│  4. Take the 5 most recent memories                             │
-│  5. Get last session summary from sessions.jsonl                │
-│  6. Output systemMessage + systemPrompt via stdout              │
+│     - First time: calls Set Conversation Metadata API           │
+│  3. Send session start memory to EverMem Cloud                  │
+│     - Records: timestamp, session_id, group_id, path, action    │
+│     - Action: "created" (new session) or "resumed" (continued)  │
+│  4. Fetch recent memories from EverMem API (limit: 100)         │
+│  5. Take the 5 most recent memories                             │
+│  6. Get last session summary from sessions.jsonl                │
+│  7. Output systemMessage + systemPrompt via stdout              │
 └─────────────────────────────────────────────────────────────────┘
                                │
                                ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │                    Claude Code Receives                          │
 │                                                                  │
-│  • systemMessage: "💡 EverMem: Last session (2h ago): \"...\" | 5 memories"│
+│  • systemMessage: "💡 EverMem: Previous session (2h ago, 5 turns) | 记忆主题1 | 记忆主题2"│
 │  • systemPrompt: <session-context>...</session-context>         │
 │                                                                  │
 │  The systemPrompt is injected into Claude's context window      │
@@ -380,16 +447,23 @@ The SessionStart hook runs when Claude Code starts a new session. It loads recen
   "session_id": "<session-uuid>",
   "cwd": "/path/to/your/project",
   "permission_mode": "default",
-  "hook_event_name": "SessionStart"
+  "hook_event_name": "SessionStart",
+  "is_resumed": false
 }
 ```
+
+**is_resumed Field:**
+- `false` - New session created (user runs `claude` command fresh)
+- `true` - Session resumed (user continues from a previous session)
+
+Claude Code sets this based on whether the session ID already exists in the transcript history.
 
 ### Hook Output (stdout)
 
 ```json
 {
   "continue": true,
-  "systemMessage": "💡 EverMem: Last session (2h ago): \"Implementing JWT authentication...\" | 5 memories",
+  "systemMessage": "💡 EverMem: Previous session (2h ago, 5 turns) | JWT实现讨论 | API认证设计",
   "systemPrompt": "<session-context>\nLast session (2h ago, 5 turns): Implementing JWT authentication for the API\n\nRecent memories (5):\n\n[1] (2/9/2026) JWT token implementation\n...\n</session-context>"
 }
 ```
@@ -410,6 +484,40 @@ The hook combines two data sources:
 2. **Local Session Summary** - Last session from `data/sessions.jsonl` (saved by SessionEnd hook)
 
 No AI summarization is used - pure local data extraction for zero latency and no additional API costs.
+
+### Display Format
+
+The systemMessage shows meaningful memory subjects extracted from cloud memories:
+
+```
+💡 EverMem: Previous session (2h ago, 5 turns) | JWT实现讨论 | API认证设计
+```
+
+**Subject Filtering:**
+- System messages are filtered out (session start/end, initialization, creation)
+- Date prefixes are removed from subjects (e.g., "2026年2月14日关于..." → extracted topic)
+- Only meaningful work topics are displayed
+
+### Session Start Memory (Cloud)
+
+The hook sends a session start event to EverMem Cloud, with action based on `is_resumed`:
+
+```
+# New session (is_resumed: false)
+[Session Start] User created session at 2026-02-13T10:00:00Z. session_id: abc-123, group_id: ever_a3f2c, path: /path/to/project
+
+# Resumed session (is_resumed: true)
+[Session Start] User resumed session at 2026-02-13T10:00:00Z. session_id: abc-123, group_id: ever_a3f2c, path: /path/to/project
+```
+
+This records:
+- **Timestamp** - When the session started
+- **Session ID** - Unique identifier for this session
+- **Group ID** - Project identifier (10 chars)
+- **Path** - Working directory
+- **Action** - "created" (`is_resumed: false`) or "resumed" (`is_resumed: true`)
+
+This allows the cloud to track session lifecycle events and provide accurate session analytics.
 
 ### Error Handling
 
@@ -434,9 +542,39 @@ The hook requires Node.js 18+ for ES modules support. If an older version is det
 }
 ```
 
+### Debounce & Project Isolation
+
+SessionStart uses debounce to prevent duplicate API calls when Claude Code triggers the hook multiple times in quick succession.
+
+**Project-Specific Cache Files:**
+
+Cache files are isolated per project using a hash of the working directory:
+
+```
+/tmp/evermem-session-start-{cwd_hash}.lock      # Debounce lock
+/tmp/evermem-session-start-{cwd_hash}-output.json  # Cached output
+```
+
+Example for two concurrent projects:
+```
+/tmp/evermem-session-start-d097cb8a.lock  ← /Users/admin/Desktop/shanda
+/tmp/evermem-session-start-8d8d53b2.lock  ← /Users/admin/Desktop/evermem-claude-code
+```
+
+**Why Project Isolation Matters:**
+
+Without project-specific cache files, running two Claude Code instances simultaneously could cause:
+- Project A's cached output being returned for Project B
+- Wrong `group_id` being used (memories sent to wrong project)
+- Incorrect session statistics displayed
+
+The `cwd_hash` (first 8 chars of SHA-256 hash of cwd) ensures each project has isolated cache files.
+
 ## SessionEnd Hook
 
-The SessionEnd hook runs when a Claude Code session ends. It saves a session summary to local storage for use by the SessionStart hook.
+The SessionEnd hook runs when a Claude Code session ends. It saves a session summary to **local storage only** (no cloud API call).
+
+> **Note**: SessionEnd previously sent a memory to cloud with `flush=true` to force memory extraction. This was removed because `flush=true` forces MemoryCell creation, which consumes quota too quickly (free tier: 100 cells). A single `/exit` would create a MemoryCell even with minimal conversation.
 
 ### Architecture
 
@@ -456,7 +594,9 @@ The SessionEnd hook runs when a Claude Code session ends. It saves a session sum
 │  2. Check if session already summarized (skip if yes)           │
 │  3. Parse transcript JSONL file                                 │
 │  4. Extract: first user prompt, turn count, timestamps          │
-│  5. Save to data/sessions.jsonl                                 │
+│  5. Save to data/sessions.jsonl (local only)                    │
+│                                                                  │
+│  Note: No cloud API call (quota optimization)                   │
 └─────────────────────────────────────────────────────────────────┘
                                │
                                ▼
@@ -496,7 +636,7 @@ Each session is saved as a single line in `data/sessions.jsonl`:
 ```json
 {
   "sessionId": "<session-uuid>",
-  "groupId": "claude-code:/path/to/project",
+  "groupId": "ever_a3f2c",
   "summary": "First user prompt truncated to 200 characters",
   "turnCount": 5,
   "reason": "user_exit",
@@ -523,15 +663,31 @@ Each session is saved as a single line in `data/sessions.jsonl`:
 
 Each session is only saved once. Before saving, the hook checks if the sessionId already exists in `sessions.jsonl`.
 
-### No AI Summarization
+### No AI Summarization (Local)
 
 The SessionEnd hook uses a simple approach: the first user prompt becomes the session summary. This provides:
 
-- **Zero latency** - No API calls needed
+- **Zero latency** - No API calls needed for local storage
 - **Zero cost** - No Haiku or other model usage
 - **Reliability** - Works offline, no external dependencies
 
 The first user prompt typically describes what the user wanted to accomplish, making it a natural summary of the session's purpose.
+
+### Cloud Memory Extraction (Removed)
+
+> **Important**: SessionEnd previously sent a memory to cloud with `flush=true`. This feature was **removed** due to quota concerns.
+
+**Why it was removed:**
+
+The `flush: true` parameter forces the server to immediately create a MemoryCell from the conversation buffer. This means:
+
+- Every `/exit` creates a MemoryCell, even with minimal conversation
+- Free tier quota (100 MemoryCells) gets consumed very quickly
+- A simple "hello" + "/exit" would cost 1 MemoryCell
+
+**Current behavior:**
+
+SessionEnd now only saves to local `sessions.jsonl`. Memories are created naturally through the Stop hook when Claude responds to your prompts, which is more quota-efficient.
 
 ### Design Philosophy: Deferred Display Pattern
 
@@ -555,7 +711,7 @@ The SessionEnd and SessionStart hooks work together using a **"save now, display
 │                                                                 │
 │  SessionStart Hook:                                             │
 │  • Reads last session from sessions.jsonl                       │
-│  • Displays: "Last (2h ago, 5 turns): Your question..."         │
+│  • Displays: "Previous session (2h ago, 5 turns): Your question..."│
 │  • Provides continuity across sessions                          │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -586,13 +742,16 @@ The SessionEnd and SessionStart hooks work together using a **"save now, display
 The SessionStart hook automatically records project groups to `data/groups.jsonl` (JSONL format):
 
 ```jsonl
-{"keyId":"9a823d2f8ea5","groupId":"claude-code:/path/to/project-a","name":"project-a","path":"/path/to/project-a","timestamp":"2026-02-09T06:00:00Z"}
-{"keyId":"9a823d2f8ea5","groupId":"claude-code:/path/to/api-server","name":"api-server","path":"/path/to/api-server","timestamp":"2026-02-09T08:00:00Z"}
+{"keyId":"9a823d2f8ea5","groupId":"proj_a1b2c","name":"project-a","path":"/path/to/project-a","timestamp":"2026-02-09T06:00:00Z"}
+{"keyId":"9a823d2f8ea5","groupId":"apis_d3e4f","name":"api-server","path":"/path/to/api-server","timestamp":"2026-02-09T08:00:00Z"}
 ```
 
 **Fields:**
 - `keyId`: SHA-256 hash (first 12 chars) of the API key - associates groups with accounts
-- `groupId`: Unique identifier based on working directory, format: `claude-code:{path}`
+- `groupId`: Unique identifier (10 chars), format: `{name4}_{hash5}` (e.g., `ever_a3f2c`)
+  - First 4 chars: project folder name (lowercase, alphanumeric)
+  - `_`: separator
+  - Last 5 chars: SHA-256 hash of the full path
 - `name`: Project folder name
 - `path`: Full path to the project
 - `timestamp`: When the group was first recorded
@@ -722,6 +881,24 @@ assistant/text (parent: ...)       ← Final response
 system/turn_duration (parent: ...) ← Turn end
 ```
 
+**Key Insight: Distinguishing User Questions from Tool Results**
+
+Both appear as `type: "user"` in JSONL, but have different `content` structures:
+
+| Message Type | `message.content` Type | Example |
+|--------------|------------------------|---------|
+| User Question | `string` | `"How do I add auth?"` |
+| Tool Result | `array` | `[{"type":"tool_result",...}]` |
+| Interrupt | `array` with text | `[{"type":"text","text":"[Request interrupted by user]"}]` |
+
+The plugin uses this distinction to identify real user input vs system-generated tool results:
+```javascript
+function isUserQuestion(line) {
+  return line.type === 'user'
+    && typeof line.message?.content === 'string';  // STRING = question
+}
+```
+
 ### Memory Extraction
 
 The `store-memories.js` hook extracts the **last complete Turn**:
@@ -732,26 +909,98 @@ The `store-memories.js` hook extracts the **last complete Turn**:
 3. **Collect user text** - Original input only (skip `tool_result`)
 4. **Collect assistant text** - All `text` blocks (skip `thinking`, `tool_use`)
 5. **Merge content** - Join scattered text blocks with `\n\n` separator
-6. **Upload to cloud** - Send both user and assistant content to EverMem API
+6. **Filter invalid content** - Skip system messages and empty responses
+7. **Apply length limits** (two-phase):
+   - Concat phase: User <= 6000 chars, Assistant <= 15000 chars (stop adding blocks after limit)
+   - Truncate phase: User > 2000 → truncate, Assistant > 4000 → truncate
+   - Truncation adds `[... truncated, original: N chars]` marker
+9. **Upload to cloud** - Send both user and assistant content to EverMem API
 
-**Race Condition Handling:**
+**Content Filtering:**
 
-The Stop hook runs before `turn_duration` is written. To ensure complete content extraction:
+The plugin filters out system-generated messages that aren't useful as memories:
 
+| Pattern | Description | Example |
+|---------|-------------|---------|
+| `<local-command-*>` | CLI command output markers | `<local-command-stdout>See ya!</local-command-stdout>` |
+| `<system-reminder>` | System-injected reminders | `<system-reminder>Check memory...</system-reminder>` |
+| `<command-name>` | Slash command markers | `<command-name>/clear</command-name>` |
+| `<local-command-caveat>` | Command caveat markers | - |
+| `No response requested.` | Empty turn marker | - |
+
+**Content Length Limits:**
+
+| Role | Concat Limit | Final Limit | Action |
+|------|--------------|-------------|--------|
+| User | 6000 chars | 2000 chars | **Truncate** |
+| Assistant | 15000 chars | 4000 chars | **Truncate** |
+
+Processing flow:
+1. **Concatenation phase**: Text blocks are joined up to concat limit (stops adding more after limit)
+2. **Truncation phase**: Final content is truncated to final limit with `[... truncated, original: N chars]` marker
+
+This two-phase approach:
+- Limits memory usage during text block concatenation
+- Ensures final stored content is reasonably sized
+- Preserves the beginning of content (usually most important)
+
+**Race Condition Handling (Timing Issue):**
+
+> ⚠️ **Important**: The Stop hook runs BEFORE `turn_duration` is written to the JSONL file.
+
+**Execution Timeline:**
+```
+1. Claude finishes responding (all text/tool_use written to JSONL)
+2. Claude Code triggers Stop hook
+3. Stop hook reads JSONL file ← turn_duration NOT present yet
+4. stop_hook_summary is written
+5. Stop hook completes
+6. turn_duration is written ← Only available AFTER hook finishes
+```
+
+**Why this matters:**
+- The retry mechanism waiting for `turn_duration` will always timeout (5 attempts × 100ms = 500ms)
+- Content extraction must work WITHOUT relying on `turn_duration` for the current turn
+
+**Our Solution - Boundary-based Extraction:**
 ```javascript
-// Retry until turn_duration appears (max 5 attempts, 100ms delay)
-async function readTranscriptWithRetry(path) {
-  for (let attempt = 1; attempt <= 5; attempt++) {
-    const lines = readFile(path);
-    const lastLine = JSON.parse(lines[lines.length - 1]);
-
-    // turn_duration = turn complete
-    if (lastLine.type === 'system' && lastLine.subtype === 'turn_duration') {
-      return lines;
+function extractLastTurn(lines) {
+  // Find START: line after the PREVIOUS turn's turn_duration
+  let turnStartIndex = 0;
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const e = JSON.parse(lines[i]);
+    if (e.type === 'system' && e.subtype === 'turn_duration') {
+      turnStartIndex = i + 1;  // Start AFTER this marker
+      break;
     }
-
-    await sleep(100);  // Wait and retry
   }
+
+  // END: Always the end of file (current turn is incomplete by definition)
+  const turnEndIndex = lines.length;
+
+  // Extract content between these boundaries
+  return extractContent(lines, turnStartIndex, turnEndIndex);
+}
+```
+
+**Key Insight:**
+- We use the PREVIOUS turn's `turn_duration` as the START boundary
+- We use end-of-file as the END boundary
+- This captures the current (incomplete) turn without waiting for its `turn_duration`
+
+**Risk Mitigation:**
+- Claude Code flushes all assistant messages to disk before triggering the Stop hook
+- The 500ms retry provides a safety buffer for slow I/O
+- If content is still missing, it will be captured in the next turn's extraction
+
+**For Batch Processing (Test Scripts):**
+When analyzing historical JSONL files, skip the last turn if it doesn't end with `turn_duration`:
+```javascript
+// Only process complete turns for historical analysis
+const lastLine = JSON.parse(lines[lines.length - 1]);
+if (lastLine.type !== 'system' || lastLine.subtype !== 'turn_duration') {
+  console.warn('Last turn is incomplete, skipping...');
+  // Process only up to the last turn_duration
 }
 ```
 
@@ -771,8 +1020,7 @@ Each message is sent to `POST /api/v0/memories`:
   "sender": "claude-code-user",
   "role": "user",
   "content": "How do I add authentication?",
-  "group_id": "claude-code:/path/to/project",
-  "group_name": "Claude Code Session"
+  "group_id": "ever_a3f2c"
 }
 ```
 
@@ -841,7 +1089,7 @@ The `/evermem:hub` command opens a web dashboard for visualizing memories. Due t
 │  Why Proxy?                                                                  │
 │  - Browser limitation: GET requests can't have body                         │
 │  - EverMem API uses GET /api/v0/memories with JSON body                     │
-│  - Proxy receives POST, converts to GET+body using curl                     │
+│  - Proxy receives POST, converts to GET+body using native https             │
 └─────────────────────────────────────────────────────────────────────────────┘
                                     │
                                     ▼
@@ -882,7 +1130,7 @@ function getGroupsForKey(keyId) {
 
 // Key route: Forward POST as GET+body (browser workaround)
 // Browser sends:  POST /api/v0/memories { body }
-// Proxy sends:    GET  /api/v0/memories { body } via curl
+// Proxy sends:    GET  /api/v0/memories { body } via native https
 ```
 
 ### Dashboard (`assets/dashboard.html`)
@@ -945,88 +1193,6 @@ async function loadGroups() {
 └── [Load more (17 remaining)]
 ```
 
-## Debug Logging
-
-Both `inject-memories.js` and `store-memories.js` use a shared debug utility:
-
-```javascript
-import { debug, setDebugPrefix } from './utils/debug.js';
-
-setDebugPrefix('inject');  // Log lines will show [inject] prefix
-debug('hookInput:', data); // Only writes when EVERMEM_DEBUG=1
-```
-
-**Debug output by script:**
-
-| Script | Prefix | Debug Points |
-|--------|--------|--------------|
-| `inject-memories.js` | `[inject]` | hookInput, search query, search results, filtered/selected memories, output |
-| `store-memories.js` | `[store]` | hookInput, read attempts, turn range, line types, extracted content, results |
-
-**Example debug log:**
-
-```log
-# Memory injection (UserPromptSubmit hook)
-[2026-02-06T08:47:30.100Z] [inject] hookInput: { "prompt": "How do I add auth?", ... }
-[2026-02-06T08:47:30.150Z] [inject] searching memories for prompt: How do I add auth?
-[2026-02-06T08:47:30.500Z] [inject] search results: {"total": 5, "memories": [...]}
-[2026-02-06T08:47:30.520Z] [inject] selected memories: [{"score": 0.85, "subject": "JWT implementation"}]
-
-# Memory storage (Stop hook)
-[2026-02-06T08:47:36.184Z] [store] hookInput: { "transcript_path": "...jsonl", ... }
-
-# Retry logic - waiting for turn_duration
-[2026-02-06T08:47:36.200Z] [store] read attempt 1: { "totalLines": 525, "isComplete": false, "lastLineType": "progress" }
-[2026-02-06T08:47:36.201Z] [store] turn not complete, waiting 100ms before retry...
-[2026-02-06T08:47:36.310Z] [store] read attempt 2: { "totalLines": 527, "isComplete": false, "lastLineType": "system/stop_hook_summary" }
-[2026-02-06T08:47:36.311Z] [store] turn not complete, waiting 100ms before retry...
-[2026-02-06T08:47:36.420Z] [store] read attempt 3: { "totalLines": 528, "isComplete": true, "lastLineType": "system/turn_duration" }
-
-# Content extraction
-[2026-02-06T08:47:36.425Z] [store] turn range: { "turnStartIndex": 500, "turnEndIndex": 528, "totalLines": 528 }
-[2026-02-06T08:47:36.430Z] [store] assistantTexts count: 3
-[2026-02-06T08:47:36.435Z] [store] extracted: { "userLength": 59, "assistantLength": 847, ... }
-
-# API upload results
-[2026-02-06T08:47:36.970Z] [store] results: [
-  {
-    "type": "USER",
-    "len": 59,
-    "status": 202,
-    "ok": true,
-    "response": {
-      "message": "Message accepted and queued for processing",
-      "status": "queued"
-    }
-  },
-  {
-    "type": "ASSISTANT",
-    "len": 127,
-    "status": 202,
-    "ok": true,
-    "response": { ... }
-  }
-]
-[2026-02-06T08:47:36.975Z] [store] skipped: []
-```
-
-**Using debug.js in your own hooks:**
-
-```javascript
-import { debug, setDebugPrefix, isDebugEnabled } from './utils/debug.js';
-
-// Set prefix to identify your script in logs
-setDebugPrefix('my-hook');
-
-// Log objects (auto JSON stringified) or strings
-debug('processing:', { key: 'value' });
-
-// Check if debug is enabled
-if (isDebugEnabled()) {
-  // expensive debug operations
-}
-```
-
 ## Project Structure
 
 ```
@@ -1036,11 +1202,13 @@ evermem-plugin/
 │   ├── help.md               # /evermem:help command
 │   ├── search.md             # /evermem:search command
 │   ├── hub.md                # /evermem:hub command
-│   ├── debug.md              # /evermem:debug command
-│   └── projects.md           # /evermem:projects command
+│   ├── ask.md                # /evermem:ask command
+│   ├── projects.md           # /evermem:projects command
+│   └── addHistory.md         # /evermem:addHistory command (retroactive import)
 ├── data/
 │   ├── groups.jsonl          # Local storage for tracked projects (JSONL format)
-│   └── sessions.jsonl        # Local storage for session summaries (JSONL format)
+│   ├── sessions.jsonl        # Local storage for session summaries (JSONL format)
+│   └── history-preview.jsonl # Temporary file for /evermem:addHistory (auto-deleted)
 ├── hooks/
 │   ├── hooks.json            # Hook configuration
 │   └── scripts/
@@ -1048,10 +1216,12 @@ evermem-plugin/
 │       ├── store-memories.js     # Memory save (Stop)
 │       ├── session-context.js    # Session context (SessionStart)
 │       ├── session-summary.js    # Session summary (SessionEnd)
+│       ├── add-history.js        # Retroactive history upload (main script)
+│       ├── extract-history.js    # Q&A extraction from transcript
+│       ├── upload-history.js     # Upload extracted Q&A to cloud
 │       └── utils/
 │           ├── evermem-api.js    # EverMem Cloud API client
 │           ├── config.js         # Configuration utilities
-│           ├── debug.js          # Shared debug logging utility
 │           └── groups-store.js   # Local groups persistence
 ├── assets/
 │   └── dashboard.html        # Memory Hub dashboard
@@ -1064,9 +1234,48 @@ evermem-plugin/
 
 The plugin uses the EverMem Cloud API at `https://api.evermind.ai`:
 
-- `POST /api/v0/memories` - Store a new memory
-- `GET /api/v0/memories/search` - Search memories (hybrid retrieval, with JSON body)
-- `GET /api/v0/memories` - Get memories (with query params)
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/v0/memories` | POST | Store a new memory (Q&A pairs, session events) |
+| `/api/v0/memories` | GET | Get memories (with query params) |
+| `/api/v0/memories/search` | GET | Search memories (hybrid retrieval, with JSON body, requires Content-Length header, radius=0.1) |
+| `/api/v0/memories/conversation-meta` | POST | Set conversation metadata (first time group creation) |
+
+**Note on API Call Ordering:**
+
+The `POST /api/v0/memories` endpoint uses queue-based processing. When a memory is submitted, the API returns immediately:
+
+```json
+{
+  "status": "queued",
+  "message": "Message accepted and queued for processing",
+  "request_id": "<request-uuid>"
+}
+```
+
+This means actual memory extraction happens asynchronously on the server. When viewing API call logs at [console.evermind.ai/req-logs](https://console.evermind.ai/req-logs), the requests may not appear in strict "1 search + 2 add" order for each Q&A turn. The search request (from UserPromptSubmit hook) and the two add requests (user message + assistant response from Stop hook) are processed independently and may complete in any order.
+
+**Dual-Threshold Filtering (Memory Search):**
+
+The plugin uses a dual-threshold approach for memory retrieval:
+
+| Layer | Parameter | Value | Location |
+|-------|-----------|-------|----------|
+| Server-side | `radius` | `0.1` | `evermem-api.js` (sent to API) |
+| Client-side | `MIN_SCORE` | `0.1` | `inject-memories.js` (local filter) |
+
+1. **Server-side (`radius: 0.1`)**: The EverMem API filters memories by cosine similarity threshold during vector/hybrid retrieval. Only memories with similarity >= 0.1 are returned.
+
+2. **Client-side (`MIN_SCORE: 0.1`)**: After receiving results, the plugin filters again locally. This provides double insurance in case server behavior changes.
+
+If no memories pass the threshold, the user sees: `📝 Memory: Found N memories, 0 above threshold (0.1)`
+
+**Session Event Messages:**
+
+| Event | Content Format | Special Params |
+|-------|----------------|----------------|
+| Session Start | `[Session Start] User {created/resumed} session at {time}. session_id: {id}, group_id: {gid}, path: {path}` | - |
+| Session End | _(No cloud message - local only)_ | - |
 
 ## Development
 
@@ -1093,3 +1302,4 @@ echo '{"prompt":"How do I handle authentication?"}' | node hooks/scripts/inject-
 # Test memory save (requires transcript file)
 echo '{"transcript_path":"/path/to/transcript.json"}' | node hooks/scripts/store-memories.js
 ```
+

@@ -36,11 +36,6 @@ async function main() {
       retrieveMethod: 'hybrid'
     });
 
-    // Debug: show raw API response
-    console.log('--- RAW API RESPONSE ---');
-    console.log(JSON.stringify(apiResponse, null, 2));
-    console.log('--- END RAW RESPONSE ---\n');
-
     const memories = transformSearchResults(apiResponse);
 
     if (memories.length === 0) {
