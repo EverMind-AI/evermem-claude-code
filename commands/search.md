@@ -1,5 +1,5 @@
 ---
-description: Search EverMem for relevant memories from past sessions
+description: Search EverMem for relevant memories from past sessions (use Ctrl+O to expand collapsed results)
 arguments:
   - name: query
     description: The search query to find relevant memories
